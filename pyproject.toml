@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name="crsq-main"
+version="0.0.1"
+dependencies = [
+    "qiskit >= 1.0",
+    "crsq-heap >= 0.0.1",
+    "crsq-arithmetic >= 0.0.1"
+]
+authors = [
+    { name="Hideo Takahashi" }
+]
+description="CRSQ - Chemical Reaction Simulator Q main package"
+readme="README.md"
+requires-python=">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage="https://github.com/crsq-dev/crsq-main"
+Issues="https://github.com/crsq-dev/crsq-main/issues"
+
+
+[tool.hatch.build.targets.wheel]
+packages = [
+    "src/crsq/blocks",
+    "src/crsq/slater",
+    "src/crsq/top",
+    "src/crsq/utils"
+]
