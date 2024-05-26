@@ -154,7 +154,6 @@ class FirstQIntegrator:
         self.v_numerator_int_bits: int
         self.k: float
         self.frame: IntegratorFrame
-        self.elec_potential_frame: IntegratorFrame
         self.shuffle_frame: slater.BRegisterFrame
         # progress flags
         self.size_calculation_done = False
@@ -432,17 +431,6 @@ class FirstQIntegrator:
     def _add_wave_function_registers(self, frame: IntegratorFrame):
         self._add_coord_index_registers(frame)
 
-        # # this code was moved inside above called _add_coord_index_registers()
-        # num_index_bits = self.slater_permutation_index_bits
-        # N = self.num_electrons
-        # assert 2**num_index_bits >= N
-        # sigma_regs = [QuantumRegister(num_index_bits, name=f"b{i}")
-        #                    for i in range(N)]
-        # if self.num_electrons >= 2:
-        #     ancilla_reg = QuantumRegister(1, "shuffle")
-        #     frame.breg_frame.set_ancilla(ancilla_reg)
-        #     frame.breg_frame.set_bregs(sigma_regs)
-
     def _add_coord_index_registers(self, frame: IntegratorFrame):
         # We want the elec coords to appear first.
         # This will make the elec coords on the lower bits of the state vector.
@@ -455,27 +443,8 @@ class FirstQIntegrator:
     def _add_nuclei_coord_index_registers(self, frame: IntegratorFrame):
         nregs = self.wfr_spec.allocate_nucl_registers()
         frame.set_nuclei_index_regs(nregs)
-        # n = self.coordinate_bits
-        # dimensions = 'xyz'
-        # nuclei = []
-        # for i in range(self.num_nuclei):
-        #     dims = []
-        #     for d in range(self.dimension):
-        #         ir = QuantumRegister(n, name=f"an{i}{dimensions[d]}")
-        #         dims.append(ir)
-        #     nuclei.append(dims)
-        # frame.set_nuclei_index_regs(nuclei)
 
     def _add_elec_coord_index_registers(self, frame: IntegratorFrame):
-        # assert frame.breg_frame.areg_frame is not None
-
-        # breg_frame = frame.breg_frame
-        # self.slater_breg.allocate_registers_on_frame(breg_frame)
-        # We take the register structure built by ARegister
-        # and keep a shallow copy of it, and declare it as
-        # our own registers
-        # areg_frame = frame.breg_frame.areg_frame
-        # frame.set_elec_index_regs(areg_frame.aregs)
         eregs = self.wfr_spec.allocate_elec_registers()
         frame.set_elec_index_regs(eregs)
 
@@ -495,10 +464,6 @@ class FirstQIntegrator:
             self.build_circuit_y()
             return
 
-        # self._build_initialization_step()
-        # self._build_time_evolution_block_type1()
-        # self.circuit_is_built = True
-
     def build_circuit_y(self):
         """ build circuit, new edition"""
         self._build_time_evolution_step_y()
@@ -512,7 +477,6 @@ class FirstQIntegrator:
                 bregs=self.frame.slater_bregs,
                 shuffle=self.frame.slater_ancilla,
                 p=self.frame.energy_configuration_reg,
-                # pa=self.frame.energy_configuration_ancilla_reg
                 ))
 
     def build_initialization_block(self):
@@ -532,7 +496,6 @@ class FirstQIntegrator:
                 slater_indices=self.frame.slater_bregs,
                 slater_ancilla=self.frame.slater_ancilla,
                 p=self.frame.energy_configuration_reg,
-                # pa=self.frame.energy_configuration_ancilla_reg
                 ),
                 invoke_as_instruction=True)
 
@@ -557,29 +520,13 @@ class FirstQIntegrator:
     def _build_electron_motion_block(self, frame: IntegratorFrame):
         use_new_scheme = True
         if self.should_calculate_potential_term:
-            if use_new_scheme:
-                self._build_elec_potential_step_y(frame)
-            else:
-                sub_frame = self._build_elec_potential_step_x()
-                frame.apply(sub_frame)
+            self._build_elec_potential_step_y(frame)
         if self.should_apply_qft:
-            if use_new_scheme:
-                self._build_apply_qft_step_y(frame)
-            else:
-                sub_frame = self._build_apply_qft_step_x()
-                frame.apply(sub_frame)
+            self._build_apply_qft_step_y(frame)
         if self.should_calculate_kinetic_term:
-            if use_new_scheme:
-                self._build_elec_kinetic_step_y(frame)
-            else:
-                sub_frame = self._build_elec_kinetic_step_x()
-                frame.apply(sub_frame)
+            self._build_elec_kinetic_step_y(frame)
         if self.should_apply_qft:
-            if use_new_scheme:
-                self._build_apply_qft_step_y(frame, inverse=True)
-            else:
-                sub_frame = self._build_apply_qft_step_x(inverse=True)
-                frame.apply(sub_frame)
+            self._build_apply_qft_step_y(frame, inverse=True)
 
     def build_nucleus_motion_block(self) -> time_evolution.NucleusMotionBlock:
         """ build the block object """
@@ -589,29 +536,13 @@ class FirstQIntegrator:
     def _build_nuclei_motion_block(self, frame: IntegratorFrame):
         use_new_scheme = True
         if self.should_calculate_potential_term:
-            if use_new_scheme:
-                self._build_nuclei_potential_step_y(frame)
-            else:
-                sub_frame = self._build_nuclei_potential_step_x()
-                frame.apply(sub_frame)
+            self._build_nuclei_potential_step_y(frame)
         if self.should_apply_qft:
-            if use_new_scheme:
-                self._build_apply_qft_step_y(frame)
-            else:
-                sub_frame = self._build_apply_qft_step_x()
-                frame.apply(sub_frame)
+            self._build_apply_qft_step_y(frame)
         if self.should_calculate_kinetic_term:
-            if use_new_scheme:
-                self._build_nuclei_kinetic_step_y(frame)
-            else:
-                sub_frame = self._build_nuclei_kinetic_step_x()
-                frame.apply(sub_frame)
+            self._build_nuclei_kinetic_step_y(frame)
         if self.should_apply_qft:
-            if use_new_scheme:
-                self._build_apply_qft_step_y(frame, inverse=True)
-            else:
-                sub_frame = self._build_apply_qft_step_x(inverse=True)
-                frame.apply(sub_frame)
+            self._build_apply_qft_step_y(frame, inverse=True)
 
     def _build_elec_potential_step_y(self, frame: IntegratorFrame):
         block = self.build_elec_potential_block()
@@ -628,149 +559,6 @@ class FirstQIntegrator:
             self.ham_spec, self.disc_spec, allocate=allocate, build=build)
         return block
 
-    def _build_elec_potential_step_x(self) -> heap.Frame:
-        """ potential energy step for electrons """
-        sub_frame = IntegratorFrame(label="Θ_ep")
-        self.elec_potential_frame = sub_frame
-        self._add_coord_index_registers(sub_frame)
-        self._add_time_evolution_work_registers(sub_frame)
-
-        scope = ast.new_scope(sub_frame)
-
-        n = self.coordinate_bits
-        m = self.v_numerator_int_bits
-        numerator_frac_bits = n + 1 - m
-        numerator_val = int(1.0 * (2**numerator_frac_bits))
-        qc = sub_frame.circuit
-        ari.set_value(qc, sub_frame.vx_const_numerator_reg, numerator_val)
-        ast_numerator = scope.register(sub_frame.vx_const_numerator_reg, numerator_frac_bits)
-
-        # prepare AST registers for electron indices
-        ast_eregs: list[list[ast.QuantumValue]] = []
-        for ie in range(self.num_electrons):
-            dims: list[ast.QuantumValue] = []
-            for d in range(self.dimension):
-                dims.append(scope.register(sub_frame.e_index_regs[ie][d], signed=True))
-            ast_eregs.append(dims)
-
-        ast_nregs = []
-        for ia in range(self.num_moving_nuclei):
-            dims = []
-            for d in range(self.dimension):
-                dims.append(scope.register(sub_frame.n_index_regs[ia][d], signed=True))
-            ast_nregs.append(dims)
-
-        self._build_elec_elec_potential_terms_x(
-            sub_frame, scope, ast_numerator, ast_eregs)
-
-        self._build_elec_nucl_potential_terms_x(
-            sub_frame, scope, ast_numerator, ast_eregs, ast_nregs)
-
-        scope.close()
-
-        # reset constant values
-        if self.should_revert_potential_ancilla_value:
-            ari.set_value(sub_frame.circuit, sub_frame.vx_const_numerator_reg, numerator_val)
-
-        return sub_frame
-
-    def get_elec_potential_frame(self) -> IntegratorFrame:
-        """ Get the RegisterSet that was used to build the electron potential term.
-        """
-        return self.elec_potential_frame
-
-    def _build_elec_elec_potential_terms_x(
-            self, sub_frame: IntegratorFrame,
-            scope: ast.Scope,
-            ast_numerator: ast.QuantumValue,
-            ast_eregs: list[list[ast.QuantumValue]]):
-
-        for ie in range(self.num_electrons):
-            for ih in range(ie + 1, self.num_electrons):
-                ast_dist: ast.QuantumValue
-                if self.dimension == 1:
-                    ast_e = ast_eregs[ie][0]
-                    ast_h = ast_eregs[ih][0]
-                    ast_e -= ast_h  # diff
-                    ast_dist =  scope.abs(ast_e)
-                else:
-                    ast_squares = []
-                    for d in range(self.dimension):
-                        ast_e = ast_eregs[ie][d]
-                        ast_h = ast_eregs[ih][d]
-                        ast_e -= ast_h  # diff
-                        ast_sq = scope.square(ast_e)
-                        ast_squares.append(ast_sq)
-                        if d > 0:
-                            ast_squares[0] += ast_squares[d]  # sum
-                    ast_dist = scope.square_root(ast_squares[0])
-
-                ast_quotient = ast_numerator / ast_dist # inv
-                sub_frame.alias_regs['elec_elec_potential_quotient'] = ast_quotient.register
-                scope.build_circuit()
-                qq = -1.0*-1.0  # product of charges
-                # apply ratio to phase
-                if self.should_apply_potential_to_phase:
-                    self._rotate_phase_by_register_x(sub_frame, ast_quotient.register, qq)
-                if self.should_revert_potential_ancilla_value:
-                    scope.build_inverse_circuit()
-                scope.clear_operations()
-
-    def _rotate_phase_by_register_x(self, frame: IntegratorFrame,
-                                  reg: QuantumRegister, charge: float):
-        n = self.coordinate_bits
-        m = self.v_numerator_int_bits
-        numerator_frac_bits = n + 1 - m
-        qc = frame.circuit
-        for i in range(reg.size):
-            digit_weight = 2**(i - numerator_frac_bits)
-            eta = charge * self.delta_t / self.delta_x
-            qc.p(-eta*digit_weight, reg[i])
-
-    def _build_elec_nucl_potential_terms_x(
-            self, sub_frame: IntegratorFrame,
-            scope: ast.Scope,
-            ast_numerator: ast.QuantumValue,
-            ast_eregs: list[list[ast.QuantumValue]],
-            ast_nregs: list[list[ast.QuantumValue]]):
-
-        if not self.nuclei_data_is_set:
-            raise ValueError("Nuclei data is not set." +
-                             " call set_nuclei_data or make_dummy_nuclei_data")
-
-        for ia in range(self.num_moving_nuclei):
-            for ie in range(self.num_electrons):
-                qe = -1.0
-                qA = self.nuclei_data[ia]['charge']
-                ast_dist: ast.QuantumValue
-                if self.dimension == 1:
-                    ast_e = ast_eregs[ie][0]
-                    ast_n = ast_nregs[ia][0]
-                    ast_e -= ast_n  # diff
-                    ast_dist = scope.abs(ast_e)
-                else:
-                    ast_squares = []
-                    for d in range(self.dimension):
-                        ast_e = ast_eregs[ie][d]
-                        ast_n = ast_nregs[ia][d]
-                        ast_e -= ast_n  # diff
-                        ast_sq = scope.square(ast_e)
-                        ast_squares.append(ast_sq)
-                        if d > 0:
-                            ast_squares[0] += ast_squares[d]  # sum
-                    ast_dist = scope.square_root(ast_squares[0])
-
-                ast_quotient = ast_numerator / ast_dist # inv
-                sub_frame.alias_regs['elec_nucl_potential_quotient'] = ast_quotient.register
-                scope.build_circuit()
-                qq = qe*qA  # product of charges
-                # apply ratio to phase
-                if self.should_apply_potential_to_phase:
-                    self._rotate_phase_by_register_x(sub_frame, ast_quotient.register, qq)
-                if self.should_revert_potential_ancilla_value:
-                    scope.build_inverse_circuit()
-                scope.clear_operations()
-
     def build_nucl_potential_block(self, allocate=True, build=True):
         """ build a NucleusPotentialBlock instance."""
         block = hamiltonian.NucleusPotentialBlock(
@@ -781,84 +569,6 @@ class FirstQIntegrator:
         block = hamiltonian.NucleusPotentialBlock(self.ham_spec, self.disc_spec)
         frame.invoke(block.bind(nregs=self.frame.n_index_regs))
 
-    def _build_nuclei_potential_step_x(self) -> heap.Frame:
-        """ potential energy step """
-        sub_frame = IntegratorFrame(label="Θ_np")
-        self._add_coord_index_registers(sub_frame)
-        if self.num_moving_nuclei <= 1:
-            return sub_frame
-        self._add_time_evolution_work_registers(sub_frame)
-
-        scope = ast.new_scope(sub_frame)
-
-        n = self.coordinate_bits
-        m = self.v_numerator_int_bits
-        numerator_frac_bits = n + 1 - m
-        numerator_val = int(1.0 * (2**numerator_frac_bits))
-        qc = sub_frame.circuit
-        ari.set_value(qc, sub_frame.vx_const_numerator_reg, numerator_val)
-        ast_numerator = scope.register(sub_frame.vx_const_numerator_reg, numerator_frac_bits)
-
-        ast_nregs: list[list[ast.QuantumValue]] = []
-        for ia in range(self.num_moving_nuclei):
-            dims: list[ast.QuantumValue] = []
-            for d in range(self.dimension):
-                dims.append(scope.register(sub_frame.n_index_regs[ia][d], signed=True))
-            ast_nregs.append(dims)
-
-        self._build_nucl_nucl_potential_terms_x(
-            sub_frame, scope, ast_numerator, ast_nregs)
-
-        scope.close()
-
-        # reset constant values
-        if self.should_revert_potential_ancilla_value:
-            ari.set_value(sub_frame.circuit, sub_frame.vx_const_numerator_reg, numerator_val)
-
-        return sub_frame
-
-    def _build_nucl_nucl_potential_terms_x(
-            self, sub_frame: IntegratorFrame,
-            scope: ast.Scope,
-            ast_numerator: ast.QuantumValue,
-            ast_nregs: list[list[ast.QuantumValue]]):
-
-        if not self.nuclei_data_is_set:
-            raise ValueError("Nuclei data is not set."
-                             " call set_nuclei_data or make_dummy_nuclei_data")
-
-        for ia in range(self.num_moving_nuclei):
-            qA = self.nuclei_data[ia]['charge']
-            for ib in range(ia+1, self.num_moving_nuclei):
-                qB = self.nuclei_data[ib]['charge']
-                ast_dist: ast.QuantumValue
-                if self.dimension == 1:
-                    ast_a = ast_nregs[ia][0]
-                    ast_b = ast_nregs[ib][0]
-                    ast_a -= ast_b  # diff
-                    ast_dist =  scope.abs(ast_a)
-                else:
-                    ast_squares = []
-                    for d in range(self.dimension):
-                        ast_a = ast_nregs[ia][d]
-                        ast_b = ast_nregs[ib][d]
-                        ast_a -= ast_b  # diff
-                        ast_sq = scope.square(ast_a)
-                        ast_squares.append(ast_sq)
-                        if d > 0:
-                            ast_squares[0] += ast_squares[d]  # sum
-                    ast_dist = scope.square_root(ast_squares[0])
-
-                ast_quotient = ast_numerator / ast_dist # inv
-                scope.build_circuit()
-                qq = qA*qB  # product of charges
-                # apply ratio to phase
-                if self.should_apply_potential_to_phase:
-                    self._rotate_phase_by_register_x(sub_frame, ast_quotient.register, qq)
-                if self.should_revert_potential_ancilla_value:
-                    scope.build_inverse_circuit()
-                scope.clear_operations()
-
     def build_elec_kinetic_block(self, build=True) -> hamiltonian.ElectronKineticBlock:
         """ build ElectronKineticBlock """
         block = hamiltonian.ElectronKineticBlock(self.wfr_spec, self.disc_spec, build=build)
@@ -868,27 +578,6 @@ class FirstQIntegrator:
         block = hamiltonian.ElectronKineticBlock(self.wfr_spec, self.disc_spec)
         frame.invoke(block.bind(eregs=self.frame.e_index_regs))
 
-    def _build_elec_kinetic_step_x(self) -> heap.Frame:
-        """ kinetic energy step for electrons"""
-        sub_frame = IntegratorFrame(label="Θ_ek")
-        qc = sub_frame.circuit
-        self._add_elec_coord_index_registers(sub_frame)
-        m_e = 1.0
-        gamma = self.delta_k * self.delta_k * self.delta_t / 2 * m_e
-        m = self.coordinate_bits
-        for ie in range(self.num_electrons):
-            for d in range(self.dimension):
-                ereg = sub_frame.e_index_regs[ie][d]
-                # Σ_j p_j^2 * 2**(2j)
-                for j in range(m):
-                    qc.p(-gamma * 2**(2*j), ereg[j])
-                for k in reversed(range(m-1)):
-                    qc.cp(gamma * 2**(m+k), ereg[m-1], ereg[k])
-                for j in reversed(range(1, m-1)):
-                    for k in reversed(range(j)):
-                        qc.cp(-gamma * 2**(j+k+1), ereg[j], ereg[k])
-        return sub_frame
-
     def build_nuclei_kinetic_block(self) -> hamiltonian.NucleusKineticBlock:
         """ build NucleusKineticBlock """
         block = hamiltonian.NucleusKineticBlock(self.wfr_spec, self.disc_spec, self.ham_spec)
@@ -897,27 +586,6 @@ class FirstQIntegrator:
     def _build_nuclei_kinetic_step_y(self, frame: IntegratorFrame):
         block = hamiltonian.NucleusKineticBlock(self.wfr_spec, self.disc_spec, self.ham_spec)
         frame.invoke(block.bind(nregs=self.frame.n_index_regs))
-
-    def _build_nuclei_kinetic_step_x(self) -> heap.Frame:
-        """ kinetic energy step for nuclei"""
-        sub_frame = IntegratorFrame(label="Θ_nk")
-        qc = sub_frame.circuit
-        self._add_nuclei_coord_index_registers(sub_frame)
-        m = self.coordinate_bits
-        for ia in range(self.num_moving_nuclei):
-            m_n = self.nuclei_data[ia]['mass']
-            gamma = self.delta_k * self.delta_k * self.delta_t / 2 * m_n
-            for d in range(self.dimension):
-                nreg = sub_frame.n_index_regs[ia][d]
-                # Σ_j p_j^2 * 2**(2j)
-                for j in range(m):
-                    qc.p(-gamma * 2**(2*j), nreg[j])
-                for k in reversed(range(m-1)):
-                    qc.cp(gamma * 2**(m+k), nreg[m-1], nreg[k])
-                for j in reversed(range(1, m-1)):
-                    for k in reversed(range(j)):
-                        qc.cp(-gamma * 2**(j+k+1), nreg[j], nreg[k])
-        return sub_frame
 
     def build_apply_qft_block(self, inverse: bool = False, build=True):
         """ build a QFT block on all index registers """
@@ -930,33 +598,6 @@ class FirstQIntegrator:
         frame.invoke(block.bind(
             eregs=self.frame.e_index_regs,
             nregs=self.frame.n_index_regs))
-
-
-    def _build_apply_qft_step_x(self, inverse: bool = False) -> heap.Frame:
-        """ apply QFT on all index registers"""
-        dim = self.dimension
-        bn = self.coordinate_bits
-        ne = self.num_electrons
-        na = self.num_moving_nuclei
-        if inverse:
-            label = f"FT{dim}\u2020({bn},{ne},{na})"  # dagger.
-        else:
-            label= f"FT{dim}({bn},{ne},{na})"
-        sub_frame = IntegratorFrame(label=label)
-        qc = sub_frame.circuit
-        self._add_coord_index_registers(sub_frame)
-
-        num_bits = self.coordinate_bits
-        for elec in sub_frame.e_index_regs:
-            # the MSB of the electron index is for the spin,
-            # and should be excluded from the QFT.
-            for d in range(self.dimension):
-                qc.append(QFT(num_bits, inverse=inverse), elec[d][:])
-        for nuc in sub_frame.n_index_regs:
-            for d in range(self.dimension):
-                qc.append(QFT(num_bits, inverse=inverse), nuc[d][:])
-
-        return sub_frame
 
     def dump_sizes(self):
         """ Dump the computed sizes"""
