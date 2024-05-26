@@ -1,7 +1,6 @@
 """ The Hamiltonian blocks implementation
 """
 
-import math
 from typing import List
 import time
 import logging
@@ -32,6 +31,9 @@ def check_time(label:str):
 
 class HamiltonianSpec:
     """ Hamiltonian spec parameters
+
+        :param wfr_spec: Wavefunction register specs
+        :param nuclei_data: [{"mass": 1680.0, "charge": 1.0}]
     """
     def __init__(self,
                  wfr_spec: wave_function.WaveFunctionRegisterSpec,

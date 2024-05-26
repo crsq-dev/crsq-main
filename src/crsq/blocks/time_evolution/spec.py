@@ -5,12 +5,18 @@ from crsq.blocks import (
     hamiltonian, discretization
 )
 
+SUZUKI_TROTTER='ST'
+
 class TimeEvolutionSpec:
-    """ Time Evolution block parameters """
+    """ Time Evolution block parameters
+
+        :param method: 'ST' for Suzuki-Trotter decomposition
+    """
     def __init__(self,
                  ham_spec: hamiltonian.HamiltonianSpec,
                  disc_spec: discretization.DiscretizationSpec,
-                 num_atom_iterations: int, num_elec_per_atom_iterations: int):
+                 num_atom_iterations: int, num_elec_per_atom_iterations: int,
+                 method=SUZUKI_TROTTER):
         self._ham_spec = ham_spec
         self._disc_spec = disc_spec
         self._num_atom_iterations = num_atom_iterations
@@ -20,6 +26,10 @@ class TimeEvolutionSpec:
         self._should_calculate_potential_term = True
         self._should_calculate_kinetic_term = True
         self._should_apply_qft = True
+        valid_methods = [SUZUKI_TROTTER]
+        if method not in valid_methods:
+            raise ValueError(f"method must be one of {valid_methods}")
+        self._method = method
 
     @property
     def ham_spec(self):
@@ -90,3 +100,9 @@ class TimeEvolutionSpec:
     def num_elec_per_atom_iterations(self):
         """ electron scale iterations per one atomic scale iteration """
         return self._num_elec_per_atom_iterations
+
+    @property
+    def method(self):
+        """ The method to use for integration
+        """
+        return self._method
