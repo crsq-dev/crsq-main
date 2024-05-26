@@ -1,4 +1,5 @@
 .crsq-main
+.env
 dist
 .vscode
 __pycache__
