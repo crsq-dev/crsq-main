@@ -3,7 +3,7 @@
 import numpy as np
 from qiskit.circuit import QuantumCircuit, QuantumRegister, Qubit
 from qiskit.circuit.library import XGate, CXGate, MCXGate, SwapGate, RZGate
-from crsq.heap import Frame
+from crsq_heap.heap import Frame
 
 from crsq.slater.sigma import build_sums
 from crsq.slater.aregister import ARegister, ARegisterFrame

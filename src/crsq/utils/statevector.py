@@ -8,8 +8,8 @@ import numpy as np
 from qiskit.circuit import Qubit, QuantumRegister, QuantumCircuit
 from qiskit.quantum_info import Statevector
 import crsq.utils.amplitudes as amp
-import crsq.arithmetic.ast as ast
-import crsq.heap as heap
+import crsq_arithmetic.ast as ast
+import crsq_heap.heap as heap
 
 def save_to_file(path: str, sv: Statevector, eps=1.0e-10):
     """ Save components of a statevector to a file

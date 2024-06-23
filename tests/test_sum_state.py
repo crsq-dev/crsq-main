@@ -2,7 +2,7 @@
 import math
 from qiskit.circuit import QuantumCircuit, QuantumRegister
 import crsq.slater.sigma as ss
-import crsq.arithmetic.test_tools as test_tools
+import crsq_arithmetic.test_tools as test_tools
 
 
 def test_find_msb():

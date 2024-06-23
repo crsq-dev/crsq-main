@@ -5,7 +5,7 @@ import pytest
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister
 import crsq.utils.setdistribution as dist
-import crsq.arithmetic.test_tools as test_tools
+import crsq_arithmetic.test_tools as test_tools
 
 
 def do_setv(n, c: list) -> QuantumCircuit:

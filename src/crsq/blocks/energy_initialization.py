@@ -7,7 +7,7 @@ import logging
 import time
 
 from qiskit import QuantumRegister
-from crsq.heap import Frame, Binding
+from crsq_heap.heap import Frame, Binding
 from crsq.blocks import antisymmetrization, embed
 
 logger = logging.getLogger(__name__)

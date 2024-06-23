@@ -39,7 +39,8 @@ class WaveFunctionRegisterSpec:
         logger.info("WaveFunctionRegisterSpec: num_moving_nuclei = %d", num_moving_nuclei)
         logger.info("WaveFunctionRegisterSpec: num_stationary_nuclei = %d", num_stationary_nuclei)
         logger.info("WaveFunctionRegisterSpec: use_spin = %d", use_spin)
-        logger.info("WaveFunctionRegisterSpec: num_orbital_index_bits = %d", self._num_orbital_index_bits)
+        logger.info("WaveFunctionRegisterSpec: num_orbital_index_bits = %d",
+                    self._num_orbital_index_bits)
 
 
     @property
@@ -81,7 +82,7 @@ class WaveFunctionRegisterSpec:
     def num_nuclei(self) -> int:
         """ number of total nuclei"""
         return self._num_moving_nuclei + self._num_stationary_nuclei
-    
+
     @property
     def num_stationary_nuclei(self) -> int:
         """ number of nuclei to be treated with B.O.A."""
@@ -96,6 +97,11 @@ class WaveFunctionRegisterSpec:
     def use_spin(self) -> bool:
         """ whether to use spin """
         return self._use_spin
+
+    @property
+    def has_elec_potential_term(self) -> bool:
+        """ has electron-electron or electron-nucleus potential term """
+        return (self._num_electrons >= 1 and self.num_nuclei >= 1) or self.num_electrons >= 2
 
     def allocate_elec_registers(self) -> List[List[QuantumRegister]]:
         """ allocate electron index registers"""

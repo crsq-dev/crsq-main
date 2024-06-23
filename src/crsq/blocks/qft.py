@@ -8,7 +8,7 @@ from qiskit import QuantumRegister
 from qiskit.circuit import library as circuit_lib
 
 
-from crsq import heap
+from crsq_heap import heap
 from crsq.blocks import wave_function
 
 logger=logging.getLogger(__name__)

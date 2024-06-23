@@ -8,8 +8,9 @@ from contextlib import contextmanager
 
 from qiskit import QuantumRegister
 from qiskit.circuit.library import XGate
-from crsq import heap, arithmetic as ari
-from crsq.arithmetic import ast
+from crsq_heap import heap
+import crsq_arithmetic as ari
+from crsq_arithmetic import ast
 from crsq.blocks import wave_function , discretization
 
 logger=logging.getLogger(__name__)

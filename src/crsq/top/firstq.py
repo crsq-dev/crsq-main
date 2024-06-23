@@ -11,9 +11,9 @@ from qiskit.circuit import QuantumCircuit, QuantumRegister
 from qiskit.circuit.library import QFT
 
 import crsq.slater as slater
-import crsq.arithmetic.ast as ast
-import crsq.arithmetic as ari
-import crsq.heap as heap
+import crsq_arithmetic.ast as ast
+import crsq_arithmetic as ari
+import crsq_heap.heap as heap
 from crsq.blocks import (
     wave_function,
     hamiltonian,
@@ -161,7 +161,7 @@ class FirstQIntegrator:
         self.circuit_is_built = False
         self.nuclei_data_is_set = False
         # sub structures
-        self.time_evolution_block: time_evolution.TimeEvolutionBlock
+        self.time_evolution_block: time_evolution.SuzukiTrotterMethodBlock
         self.slater_areg: slater.ARegister
         self.slater_breg: slater.BRegister
 
@@ -499,16 +499,16 @@ class FirstQIntegrator:
                 ),
                 invoke_as_instruction=True)
 
-    def build_time_evolution_block(self) -> time_evolution.TimeEvolutionBlock:
+    def build_time_evolution_block(self) -> time_evolution.SuzukiTrotterMethodBlock:
         """ build the block object"""
-        evo_block = time_evolution.TimeEvolutionBlock(
+        evo_block = time_evolution.SuzukiTrotterMethodBlock(
             self.evo_spec, self.ene_spec, self.asy_spec,
             use_motion_block_gates=self.should_use_motion_block_gates)
         logger.info("TimeEvolutionBlock.num_qubits=%d", evo_block.circuit.num_qubits)
         self.time_evolution_block = evo_block
         return evo_block
 
-    def get_time_evolution_block(self) -> time_evolution.TimeEvolutionBlock:
+    def get_time_evolution_block(self) -> time_evolution.SuzukiTrotterMethodBlock:
         """ get time evolution block"""
         return self.time_evolution_block
 

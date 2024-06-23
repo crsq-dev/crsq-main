@@ -7,7 +7,7 @@ import logging
 
 from qiskit import QuantumRegister
 from qiskit.circuit.library import XGate, ZGate
-from crsq import heap
+from crsq_heap import heap
 from crsq.blocks import wave_function
 from crsq import slater
 

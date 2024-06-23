@@ -3,7 +3,7 @@ import math
 
 import crsq.slater.bregister as br
 import crsq.slater.aregister as ar
-import crsq.arithmetic.test_tools as test_tools
+import crsq_arithmetic.test_tools as test_tools
 
 
 def test__min_bits_to_hold():

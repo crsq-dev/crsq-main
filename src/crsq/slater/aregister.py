@@ -3,8 +3,8 @@
 
 from qiskit import QuantumCircuit, QuantumRegister
 
-from crsq.heap import Frame
-import crsq.arithmetic as ari
+from crsq_heap.heap import Frame
+import crsq_arithmetic as ari
 
 class ARegisterFrame(Frame):
     """ Frame for ARegister

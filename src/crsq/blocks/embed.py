@@ -8,7 +8,7 @@ import time
 import logging
 
 from qiskit import QuantumRegister
-from crsq.heap import Frame, Binding
+from crsq_heap.heap import Frame, Binding
 
 logger = logging.getLogger(__name__)
 LOG_TIME_THRESH=1

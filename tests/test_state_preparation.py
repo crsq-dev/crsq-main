@@ -1,7 +1,7 @@
 from crsq.blocks.antisymmetrization import AntisymmetrizationSpec
 import crsq.blocks.energy_initialization as ene_ini
 import crsq.blocks.wave_function as wf
-import crsq.heap as heap
+import crsq_heap.heap as heap
 
 def test_energy_state_bits_preparation_block():
     """ EnergyStateBitsPreparationBlock """
