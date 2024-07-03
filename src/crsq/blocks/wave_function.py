@@ -31,7 +31,7 @@ class WaveFunctionRegisterSpec:
             int(math.ceil(math.log2(num_electrons))))
         M = 2**num_coordinate_bits
         self._delta_q = space_length/M
-        self._delta_k = 2*math.pi/M
+        self._delta_k = 2*math.pi/space_length
         logger.info("WaveFunctionRegisterSpec: dimension = %d", dimension)
         logger.info("WaveFunctionRegisterSpec: num_coordinate_bits = %d", num_coordinate_bits)
         logger.info("WaveFunctionRegisterSpec: space_length = %f", space_length)
