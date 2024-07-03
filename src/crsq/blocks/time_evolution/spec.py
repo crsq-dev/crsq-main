@@ -1,8 +1,8 @@
 """ Time evolution spec
 """
-
+from qiskit.circuit import Parameter
 from crsq.blocks import (
-    hamiltonian, discretization
+    hamiltonian, discretization, wave_function
 )
 
 SUZUKI_TROTTER='ST'
@@ -15,7 +15,8 @@ class TimeEvolutionSpec:
     def __init__(self,
                  ham_spec: hamiltonian.HamiltonianSpec,
                  disc_spec: discretization.DiscretizationSpec,
-                 num_atom_iterations: int, num_elec_per_atom_iterations: int,
+                 num_atom_iterations: int,
+                 num_elec_per_atom_iterations: int,
                  method=SUZUKI_TROTTER):
         self._ham_spec = ham_spec
         self._disc_spec = disc_spec
@@ -32,72 +33,72 @@ class TimeEvolutionSpec:
         self._method = method
 
     @property
-    def ham_spec(self):
+    def ham_spec(self) -> hamiltonian.HamiltonianSpec:
         """ Hamiltonian spec"""
         return self._ham_spec
 
     @property
-    def wfr_spec(self):
+    def wfr_spec(self) -> wave_function.WaveFunctionRegisterSpec:
         """ wave function register spec """
         return self._ham_spec.wfr_spec
 
     @property
-    def disc_spec(self):
+    def disc_spec(self) -> discretization.DiscretizationSpec:
         """ discretization spec """
         return self._disc_spec
 
-    def set_should_calculate_electron_motion(self, flag):
+    def set_should_calculate_electron_motion(self, flag: bool):
         """ set flag """
         self._should_calculate_electron_motion = flag
 
     @property
-    def should_calculate_electron_motion(self):
+    def should_calculate_electron_motion(self) -> bool:
         """ flag that tells in the time evolution spec, electron motion should bec calculated """
         return self._should_calculate_electron_motion
 
-    def set_should_calculate_nucleus_motion(self, flag):
+    def set_should_calculate_nucleus_motion(self, flag: bool):
         """ set flag """
         self._should_calculate_nucleus_motion = flag
 
     @property
-    def should_calculate_nucleus_motion(self):
+    def should_calculate_nucleus_motion(self) -> bool:
         """ flag that tells nucleus motion should be calculated"""
         return self._should_calculate_nucleus_motion
 
-    def set_should_calculate_potential_term(self, flag):
+    def set_should_calculate_potential_term(self, flag: bool):
         """ set flag """
         self._should_calculate_potential_term = flag
 
     @property
-    def should_calculate_potential_term(self):
+    def should_calculate_potential_term(self) -> bool:
         """ flag that tells potential term should be calculated """
         return self._should_calculate_potential_term
 
-    def set_should_calculate_kinetic_term(self, flag):
+    def set_should_calculate_kinetic_term(self, flag: bool):
         """ set flag """
         self._should_calculate_kinetic_term = flag
 
     @property
-    def should_calculate_kinetic_term(self):
+    def should_calculate_kinetic_term(self) -> bool:
         """ flag that tells kinetic term should be calculated """
         return self._should_calculate_kinetic_term
 
-    def set_should_apply_qft(self, flag):
+    def set_should_apply_qft(self, flag: bool):
         """ set flag"""
         self._should_apply_qft = flag
 
     @property
-    def should_apply_qft(self):
+    def should_apply_qft(self) -> bool:
         """ flag that tells QFT should be applied"""
         return self._should_apply_qft
 
     @property
-    def num_atom_iterations(self):
+    def num_atom_iterations(self) -> int:
         """ atomic scale iterations to run """
         return self._num_atom_iterations
 
     @property
-    def num_elec_per_atom_iterations(self):
+    def num_elec_per_atom_iterations(self) -> int:
         """ electron scale iterations per one atomic scale iteration """
         return self._num_elec_per_atom_iterations
 
