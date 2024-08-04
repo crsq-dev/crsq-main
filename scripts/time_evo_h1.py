@@ -1,5 +1,5 @@
 #!/mnt/nfs-01/home/hideo-t/crs1/.venv/bin/python
-import math
+import math, os
 import numpy as np
 import scipy.special as sp
 
@@ -18,7 +18,8 @@ import crsq.utils.statevector as svec
 import logging
 
 logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s',
-                    level=logging.WARN,
+                    filename='time_evo_h1.log', encoding='utf-8',
+                    level=logging.INFO,
                     datefmt='%Y-%m-%d %H:%M:%S')
 logger = logging.getLogger('TEV')
 logger.setLevel(logging.INFO)
@@ -90,13 +91,16 @@ stm = SuzukiTrotterMethodBlock(evo_spec, ene_spec, asy_spec)
 
 logger.info('draw the circuit')
 
-fname="output/h1d.circuit.png"
+outdir = "output"
+os.makedirs(outdir, exist_ok=True)
+
+fname= outdir + "/h1d.circuit.png"
 stm.circuit.draw(output='mpl', filename=fname, scale=0.6)
 
 # draw the circuit
 
 epot = stm.build_elec_potential_block()
-fname="output/h1d.circuit.elec_potential.png"
+fname= outdir + "/h1d.circuit.elec_potential.png"
 epot.circuit.draw(output='mpl', filename=fname, scale=0.6)
 
 # run the simulator
@@ -106,11 +110,14 @@ logger.info('run the simulator')
 run_calculation=True
 # run_calculation=False
 
-dirname="output/time-evolution"
+dirname= outdir + "/time-evolution"
+os.makedirs(dirname, exist_ok=True)
+
 basename="h1d"
 
 #num_iters = [1, 10, 100, 500, 1000, 1500]
 num_iters = [1, 10]
+# num_iters = [10]
 
 if run_calculation:
     backend = AerSimulator(method="statevector", device="CPU", cuStateVec_enable=False, precision="single")
@@ -132,7 +139,5 @@ if run_calculation:
         logger.info("Saving to : %s", fname)
         svec.save_to_file(fname, sv, eps=1e-12)
 
-        elementary_gate_counts = transpiled.count_ops()
-        logger.info("elementary_gate_counts %d", elementary_gate_counts)
 
 logger.info('done')
