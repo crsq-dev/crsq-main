@@ -1,4 +1,3 @@
-#!/mnt/nfs-01/home/hideo-t/crs1/.venv/bin/python
 import math, os
 import numpy as np
 import scipy.special as sp
@@ -116,7 +115,7 @@ os.makedirs(dirname, exist_ok=True)
 basename="h1d"
 
 #num_iters = [1, 10, 100, 500, 1000, 1500]
-num_iters = [1, 10]
+num_iters = [1]
 # num_iters = [10]
 
 if run_calculation:
