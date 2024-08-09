@@ -16,7 +16,6 @@ import crsq.utils.statevector as svec
 
 import logging
 
-
 # make one dimentional wave function data for H atom.
 
 def hydrogen1d_psi(xa: np.ndarray,x0: float,N: int):

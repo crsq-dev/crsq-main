@@ -1,4 +1,4 @@
-#!/bin/sh -e
+#!/bin/bash -e
 
 if [ "$#" -ne 4 ]; then
     echo "Usage: $0 <device> <cuStateVec_enable> <precision> <bits>"
