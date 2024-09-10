@@ -1,2 +1,2 @@
-# CRSQ: Chemistry Reaction Simulator Q
+# CRSQ: Chemical Reaction Simulator Q
 
