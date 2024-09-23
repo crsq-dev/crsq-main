@@ -4,7 +4,7 @@ import logging
 import time
 
 from qiskit import QuantumRegister
-from crsq import heap
+from crsq_heap import heap
 from crsq.blocks import antisymmetrization, energy_initialization, time_evolution
 
 logger = logging.getLogger(__name__)

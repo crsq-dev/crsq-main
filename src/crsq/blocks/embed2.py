@@ -69,7 +69,7 @@ class StateEmbedGate2(Frame):
             qc.rz(phi, self._qreg[bit])
         if bit >= 1:
             qc.cx(self._qreg[bit], self._work[bit-1], ctrl_state=0)
-            self.build_structure_for_bit(bit-1, norms[0][1], phases[1][1])
+            self.build_structure_for_bit(bit-1, norms[0][1], phases[0][1])
             qc.x(self._work[bit-1])
             self.build_structure_for_bit(bit-1, norms[1][1], phases[1][1])
             qc.cx(self._qreg[bit], self._work[bit-1])
@@ -119,9 +119,9 @@ class StateEmbedGate2(Frame):
             qc.crz(phi, self._work[bit], self._qreg[bit])
         if bit >= 1:
             qc.ccx(self._work[bit], self._qreg[bit], self._work[bit-1], ctrl_state="01")
-            self.build_structure_for_bit(bit-1)
+            self.build_structure_for_bit(bit-1, norms[0][1], phases[0][1])
             qc.cx(self._work[bit], self._work[bit-1])
-            self.build_structure_for_bit(bit-1)
+            self.build_structure_for_bit(bit-1, norms[1][1], phases[1][1])
             qc.ccx(self._work[bit], self._qreg[bit], self._work[bit-1])
         
 

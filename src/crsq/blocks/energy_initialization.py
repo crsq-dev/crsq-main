@@ -8,7 +8,7 @@ import time
 
 from qiskit import QuantumRegister
 from crsq_heap.heap import Frame, Binding
-from crsq.blocks import antisymmetrization, embed
+from crsq.blocks import antisymmetrization, embed, embed2
 
 logger = logging.getLogger(__name__)
 LOG_TIME_THRESH = 1
@@ -26,6 +26,7 @@ class EnergyConfigurationSpec:
         self._num_energy_configurations = len(energy_configuration_weights)
         self._num_energy_configuration_bits = math.ceil(math.log2(self._num_energy_configurations))
         self._should_initialize_energy = True
+        self._should_use_embed2 = True
         logger.info("EnergyConfigurationSpec: num_energy_configurations = %d", self._num_energy_configurations)
 
     def set_should_initialize_energy(self, flag):
@@ -63,6 +64,10 @@ class EnergyConfigurationSpec:
         """ num of bits for the energy configuration index register """
         return self._num_energy_configuration_bits
 
+    @property
+    def should_use_embed2(self):
+        """ whether to use embed2 """
+        return self._should_use_embed2
 
 class GeneralStatePreparationBlock(Frame):
     """ General state preparation block
@@ -311,7 +316,10 @@ class SlaterDeterminantPreparationBlock(Frame):
             for d, _t in enumerate(e):
                 array = e[d]
                 reg = self._e_index_regs[i][d]
-                emb = embed.StateEmbedGate(array)
+                if self._ene_spec.should_use_embed2:
+                    emb = embed2.StateEmbedGate2(array)
+                else:
+                    emb = embed.StateEmbedGate(array)
                 self.invoke(emb.bind(q=reg))
                 # setdist.setdist(qc, reg, array)
 
@@ -321,7 +329,10 @@ class SlaterDeterminantPreparationBlock(Frame):
             for d, _t in enumerate(n):
                 array = n[d]
                 reg = self._n_index_regs[a][d]
-                emb = embed.StateEmbedGate(array)
+                if self._ene_spec.should_use_embed2:
+                    emb = embed2.StateEmbedGate2(array)
+                else:
+                    emb = embed.StateEmbedGate(array)
                 self.invoke(emb.bind(q=reg))
                 # setdist.setdist(qc, reg, array)
 

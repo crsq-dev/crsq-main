@@ -6,6 +6,7 @@ from contextlib import contextmanager
 import math
 import logging
 import time
+from typing import List
 from qiskit import QuantumRegister
 from qiskit.circuit.library import ZGate
 from crsq_heap import heap
@@ -13,7 +14,8 @@ import crsq_arithmetic as ari
 from crsq.blocks import (
     embed, wave_function,
     energy_initialization,
-    antisymmetrization
+    antisymmetrization,
+    hamiltonian
 )
 from . import spec
 
@@ -43,7 +45,9 @@ class QSpaceTEVSpec:
                   k: int, alpha_l: list[float], t: float, r: int):
         """
             :param k: number of terms in the taylor expansion
-            :param l: number of terms in the unitary expansion of H
+            :param alpha_l: coefficients for the unitary expansion of H
+            :param t: time of one step of time evolution
+            :param r: number to divide one step of time evolution
         """
         self._wfr_spec = wfr_spec
         self._k = k
@@ -518,6 +522,7 @@ class WSerialBlock(heap.Frame):
         self.invoke(bser_block.bind(a=self._a_reg, b2=self._b2_reg, b1_regs=self._b1_regs))
         hxyz_gate = HodxyzBlock(q_spec)
         for k in range(q_spec.k):
+            logger.info("q_spec: k=%d", k)
             qc.s(self._a_reg[k])
             self.invoke_with_control(
                 hxyz_gate.bind(b2=self._b2_reg, b1_regs=self._b1_regs, i_regs=self._i_regs),
@@ -611,21 +616,21 @@ class ASerialBlock(heap.Frame):
         q_spec = self.q_spec
         wfr_spec = q_spec.wfr_spec
 
-        self._a_reg = QuantumRegister(q_spec.k, "a")
-        self._b2_reg = QuantumRegister(q_spec.num_l_bits, "b2")
-        self.add_param(self._a_reg, self._b2_reg)
-
-        self._b1_regs = []
         self._i_regs = []
+        self._b1_regs = []
         for dim in range(wfr_spec.dimension):
             axis="xyz"[dim]
-            b1reg = QuantumRegister(2, f"b1{axis}")
             ireg = QuantumRegister(wfr_spec.num_coordinate_bits, f"i{axis}")
-            self._b1_regs.append(b1reg)
             self._i_regs.append(ireg)
-
-        self.add_param(("b1_regs", self._b1_regs))
+            b1reg = QuantumRegister(2, f"b1{axis}")
+            self._b1_regs.append(b1reg)
         self.add_param(("i_regs", self._i_regs))
+        self.add_local(("b1_regs", self._b1_regs))
+
+        self._a_reg = QuantumRegister(q_spec.k, "a")
+        self._b2_reg = QuantumRegister(q_spec.num_l_bits, "b2")
+        self.add_local(self._a_reg, self._b2_reg)
+
 
     def build_circuit(self):
         """ build the circuit
@@ -645,7 +650,7 @@ class ASerialBlock(heap.Frame):
         self.invoke(wser_block.bind(a=self._a_reg, b2=self._b2_reg,
                                     b1_regs=self._b1_regs, i_regs=self._i_regs))
 
-    def bind(self, a, b2, b1_regs, i_regs):
+    def bind(self, i_regs):
         """ bind registers.
 
             :param a: a register. holds value for k.
@@ -654,9 +659,6 @@ class ASerialBlock(heap.Frame):
             :param i_regs: i registers.
         """
         return heap.Binding(self, {
-            "a": a,
-            "b2": b2,
-            "b1_regs": b1_regs,
             "i_regs": i_regs
         })
 
@@ -693,8 +695,8 @@ class QSpaceMethodBlock(heap.Frame):
         self._n_index_regs = wfr_spec.allocate_nucl_registers()
         self.add_param(("eregs", self._e_index_regs),
                        ("nregs", self._n_index_regs))
-        self._slater_ancilla = asy_spec.allocate_ancilla_register()
-        self.add_param(self._slater_ancilla)
+        self._shuffle = asy_spec.allocate_ancilla_register()
+        self.add_param(self._shuffle)
         self._slater_indices = asy_spec.allocate_sigma_regs()
         self.add_param(("slater_indices", self._slater_indices))
 
@@ -739,7 +741,7 @@ class QSpaceMethodBlock(heap.Frame):
                     eregs=self._e_index_regs,
                     nregs=self._n_index_regs,
                     bregs=self._slater_indices,
-                    shuffle=self._slater_ancilla,
+                    shuffle=self._shuffle,
                     p=self._energy_configuration_reg
                     ))
 
@@ -755,6 +757,220 @@ class QSpaceMethodBlock(heap.Frame):
                     eregs=self._e_index_regs,
                     nregs=self._n_index_regs,
                     bregs=self._slater_indices,
-                    shuffle=self._slater_ancilla
+                    shuffle=self._shuffle
                 )
             )
+    
+    def _build_electron_motion_block(self):
+        if self._use_motion_block_gates:
+            elec_motion_block = QspaceElectronMotionBlock(self._tev_spec, self._q_spec)
+            logger.info("QspaceElectronMotionBlock.num_qubits = %d", elec_motion_block.circuit.num_qubits)
+            with check_time("QspaceElectronMotionBlock.invoke"):
+                self.invoke(elec_motion_block.bind(
+                    eregs=self._e_index_regs,
+                    nregs=self._n_index_regs
+                ), invoke_as_instruction=True)
+            return
+        # don't use the motion block gates.
+        elec_motion_block = QspaceElectronMotionBlock(self._tev_spec, self._q_spec, build=False)
+        elec_motion_block.build_circuit_on(self)
+
+    def _build_nuclei_motion_block(self):
+        if self._use_motion_block_gates:
+            nucl_motion_block = QspaceNucleusMotionBlock(self._tev_spec, self._q_spec)
+            with check_time("NucleusMotionBlock.invoke"):
+                self.invoke(nucl_motion_block.bind(
+                    nregs=self._n_index_regs), invoke_as_instruction=True)
+            return
+        # don't use the motion block gates.
+        nucl_motion_block = QspaceNucleusMotionBlock(self._tev_spec, self._q_spec, build=False)
+        qc = self.circuit
+        nucl_motion_block.build_circuit_on(self)
+
+    def bind(self, eregs, nregs, shuffle, slater_indices, p):
+        """ bind registers.
+
+            :param eregs: electron registers.
+            :param nregs: nucleus registers.
+            :param shuffle: slater ancilla register.
+            :param slater_indices: slater indices.
+        """
+        return heap.Binding(self, {
+            "eregs": eregs,
+            "nregs": nregs,
+            "shuffle": shuffle,
+            "slater_indices": slater_indices,
+            "p": p
+        })
+
+
+class QspaceElectronMotionBlock(heap.Frame):
+    """ H_ep, H_ek
+
+        Electron motion by truncated Taylor expansion
+    """
+    def __init__(self,
+                 tev_spec: spec.TimeEvolutionSpec,
+                 q_spec: QSpaceTEVSpec,
+                 label=" TEV_e(x)", allocate=True, build=True):
+        super().__init__(label=label)
+        t1 = time.time()
+        self._tev_spec = tev_spec
+        self._q_spec = q_spec
+        self._ham_spec = tev_spec.ham_spec
+        self._disc_spec = tev_spec.disc_spec
+        self._wfr_spec = self._ham_spec.wfr_spec
+        # registers
+        self._e_index_regs: List[List[QuantumRegister]]
+        self._n_index_regs: List[List[QuantumRegister]]
+        # blocks
+        # self._elec_potential_block: hamiltonian.ElectronPotentialBlock
+        if allocate:
+            self.allocate_registers()
+            if build:
+                self.build_circuit()
+        dt = time.time() - t1
+        if dt > LOG_TIME_THRESH:
+            logger.info("ElectronMotionBlock() took %d msec", round(dt*1000))
+
+    def allocate_registers(self):
+        """ allocate registers """
+        wfr_spec = self._wfr_spec
+        self._e_index_regs = wfr_spec.allocate_elec_registers()
+        self._n_index_regs = wfr_spec.allocate_nucl_registers()
+        self.add_param(("eregs", self._e_index_regs),
+                       ("nregs", self._n_index_regs))
+    
+    def build_circuit_on(self, other_frame: heap.Frame):
+        stash_circuit = self._circuit
+        stash_tmp_allocator = self._temp_allocator
+        stash_ancilla_allocator = self._ancilla_allocator
+        self._circuit = other_frame.circuit
+        self._temp_allocator = other_frame._temp_allocator
+        self._ancilla_allocator = other_frame._ancilla_allocator
+        self.build_circuit()
+        self._circuit = stash_circuit
+        self._temp_allocator = stash_tmp_allocator
+        self._ancilla_allocator = stash_ancilla_allocator
+
+    def build_circuit(self):
+        """ build the gates for time evolution.
+            There are several variations for this.
+        """
+        wfr_spec = self._wfr_spec
+        tev_spec = self._tev_spec
+        if tev_spec.should_calculate_potential_term and wfr_spec.has_elec_potential_term:
+            self._build_elec_potential_step()
+        if tev_spec.should_calculate_kinetic_term:
+            self._build_elec_kinetic_step()
+
+    def _build_elec_potential_step(self):
+        block = self.build_elec_potential_block()
+        logger.info("ElectronPotentialBlock.num_qubits = %d", block.circuit.num_qubits)
+        with check_time("ElectronPotentialBlock.invoke"):
+            self.invoke(block.bind(eregs=self._e_index_regs, nregs=self._n_index_regs))
+
+    def build_elec_potential_block(self, allocate=True, build=True):
+        """ build a ElectronPotentialBlock instance."""
+        block = hamiltonian.ElectronPotentialBlock(
+            self._ham_spec, self._disc_spec, allocate=allocate, build=build)
+        return block
+
+    def _build_elec_kinetic_step(self):
+        block = self.build_elec_kinetic_block()
+        logger.info("ASerialBlock.num_qubits = %d", block.circuit.num_qubits)
+        for elec_i in range(self._wfr_spec.num_electrons):
+            with check_time("ASerialBlock.invoke"):
+                self.invoke(block.bind(
+                    i_regs=self._e_index_regs[elec_i]
+                ))
+
+    def build_elec_kinetic_block(self):
+        block = ASerialBlock(self._q_spec)
+        return block
+
+    def bind(self, eregs, nregs):
+        """ bind registers.
+
+            :param eregs: electron registers.
+            :param nregs: nucleus registers.
+        """
+        return heap.Binding(self, {
+            "eregs": eregs,
+            "nregs": nregs
+        })
+
+class QspaceNucleusMotionBlock(heap.Frame):
+    """ H_np, QFT, H_nk, QFT\dagger """
+    def __init__(self,
+                 tev_spec: spec.TimeEvolutionSpec,
+                 q_spec: QSpaceTEVSpec,
+                 label=" TEV_n(x)", allocate=True, build=True):
+        super().__init__(label=label)
+        self._tev_spec = tev_spec
+        self._q_spec = q_spec
+        self._ham_spec = tev_spec.ham_spec
+        self._disc_spec = tev_spec.disc_spec
+        self._wfr_spec = self._ham_spec.wfr_spec
+        # registers
+        self._n_index_regs: List[List[QuantumRegister]]
+        if allocate:
+            self.allocate_registers()
+            if build:
+                with check_time("NucleusMotionBlock.build_circuit"):
+                    self.build_circuit()
+
+    def allocate_registers(self):
+        """ allocate """
+        wfr_spec = self._wfr_spec
+        self._n_index_regs = wfr_spec.allocate_nucl_registers()
+        self.add_param(("nregs", self._n_index_regs))
+
+    def build_circuit_on(self, other_frame: heap.Frame):
+        """ Build the instructions on another compatible quantum circuit."""
+        stash_circuit = self._circuit
+        stash_tmp_allocator = self._temp_allocator
+        stash_ancilla_allocator = self._ancilla_allocator
+        self._circuit = other_frame.circuit
+        self._temp_allocator = other_frame._temp_allocator
+        self._ancilla_allocator = other_frame._ancilla_allocator
+        self.build_circuit()
+        self._circuit = stash_circuit
+        self._temp_allocator = stash_tmp_allocator
+        self._ancilla_allocator = stash_ancilla_allocator
+
+    def build_circuit(self):
+        """ build the gates for time evolution.
+            There are several variations for this.
+        """
+        if self._wfr_spec.num_moving_nuclei == 0:
+            return
+        tev_spec = self._tev_spec
+        if tev_spec.should_calculate_potential_term:
+            self._build_nuclei_potential_step()
+        if tev_spec.should_calculate_kinetic_term:
+            self._build_nuclei_kinetic_step()
+
+    def _build_nuclei_potential_step(self):
+        block = hamiltonian.NucleusPotentialBlock(self._ham_spec, self._disc_spec)
+        with check_time("NucleusPotentialBlock.invoke"):
+            self.invoke(block.bind(nregs=self._n_index_regs))
+
+    def _build_nuclei_kinetic_step(self):
+        block = self.build_nuclei_kinetic_block()
+        logger.info("ASerialBlock.num_qubits = %d", block.circuit.num_qubits)
+        for nucl_i in range(self._wfr_spec.num_moving_nuclei):
+            with check_time("ASerialBlock.invoke"):
+                self.invoke(block.bind(
+                    i_regs=self._n_index_regs[nucl_i]
+                ))
+
+    def build_nuclei_kinetic_block(self):
+        block = ASerialBlock(self._q_spec)
+        return block
+
+    def bind(self, nregs: List[List[QuantumRegister]]):
+        """ bind arguments to the function """
+        return heap.Binding(self, {
+            "nregs": nregs
+        })

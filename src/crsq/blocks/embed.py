@@ -1,4 +1,4 @@
-""" State embedding gate
+""" State embedding (preparation) gates
 """
 
 from typing import List
@@ -12,22 +12,6 @@ from crsq_heap.heap import Frame, Binding
 
 logger = logging.getLogger(__name__)
 LOG_TIME_THRESH=1
-
-def calc_phase_tree(phases: List[float]):
-    """ calc phase tree"""
-    n = len(phases)
-    half=n//2
-    if n == 2:
-        phi = phases[0] - phases[half]
-        return [phi]
-    else:
-        p0 = phases[:half]
-        p1 = phases[half:]
-        t0 = calc_phase_tree(p0)
-        t1 = calc_phase_tree(p1)
-        phi = phases[0] - phases[half] - (t0[0] - t1[0])/2
-        return [phi, [t0, t1]]
-
 
 class StateEmbedGate(Frame):
     """ State embedding gate
