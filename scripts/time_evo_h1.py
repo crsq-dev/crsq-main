@@ -34,11 +34,11 @@ def hydrogen1d_psi(xa: np.ndarray,x0: float,N: int):
 # build the simulator
 
 class Parameters:
-    def __init__(self, device='GPU', cuStateVec_enable=True, precision='single', n1=5):
+    def __init__(self, device='GPU', cuStateVec_enable=True, dim=1, precision='single', n1=5):
         self.device = device
         self.cuStateVec_enable = cuStateVec_enable
         self.precision = precision
-        self.dim = 1  # 1 dimension
+        self.dim = dim  # 1 dimension
         self.n1 = n1 # bits per coordinate
         self.M=1<<n1
         self.L = 16 # 16 bohr
@@ -154,15 +154,17 @@ if __name__ == "__main__":
                                      description='Time evolution of H atom')
     parser.add_argument('--device', type=str, default="CPU")
     parser.add_argument('--cuStateVec_enable', type=str, default="False")
+    parser.add_argument('--dim', type=int, default=1)
     parser.add_argument('--precision', type=str, default="single")
     parser.add_argument('--bits', type=int, default=5)
     args = parser.parse_args()
     print("Device : ", args.device)
     print("cuStateVec_enable : ", args.cuStateVec_enable)
+    print("Dimension : ", args.dim)
     print("Precision : ", args.precision)
     use_cuStateVec = "cuStateVec" if args.cuStateVec_enable == 'True' else "statevector"
-    tag=f'{args.device}_{use_cuStateVec}_{args.precision}_{args.bits}b'
+    tag=f'{args.device}_{use_cuStateVec}_{args.dim}D_{args.precision}_{args.bits}b'
     print("Tag : ", tag)
 
-    par = Parameters(args.device, args.cuStateVec_enable == 'True', args.precision, args.bits)
+    par = Parameters(args.device, args.cuStateVec_enable == 'True', args.dim, args.precision, args.bits)
     run_experiment(par, tag)
