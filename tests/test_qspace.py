@@ -2,7 +2,7 @@
 """
 
 from qiskit import QuantumRegister
-from crsq import heap
+from crsq_heap import heap
 from crsq_arithmetic import test_tools
 from crsq.utils import setvalue
 from crsq.blocks import wave_function

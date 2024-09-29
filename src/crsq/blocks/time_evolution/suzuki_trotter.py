@@ -6,6 +6,7 @@ import logging
 import time
 from qiskit import QuantumRegister
 from crsq_heap import heap
+import crsq.utils.statevector as utils_svec
 from crsq.blocks import (
     energy_initialization,
     antisymmetrization,
@@ -29,102 +30,6 @@ def check_time(label:str):
         logger.info("%s took %d msec", label, round(dt*1000))
     else:
         logger.info("%s end", label)
-
-
-class SuzukiTrotterIntegrator(heap.Frame):
-    """ Time Evolution Block """
-    def __init__(self,
-                 evo_spec: spec.TimeEvolutionSpec,
-                 label="ST", allocate=True, build=True, use_motion_block_gates=False):
-        super().__init__(label=label)
-        self._evo_spec = evo_spec
-        self._ham_spec = evo_spec.ham_spec
-        self._disc_spec = evo_spec.disc_spec
-        self._wfr_spec = evo_spec.wfr_spec
-        self._use_motion_block_gates = use_motion_block_gates
-        # registers
-        self._e_index_regs: List[List[QuantumRegister]]
-        self._n_index_regs: List[List[QuantumRegister]]
-        self._energy_configuration_reg: QuantumRegister = None
-        if allocate:
-            self.allocate_registers()
-            if build:
-                with check_time("SuzukiTrotterIntegrator.build_circuit"):
-                    self.build_circuit()
-
-    def allocate_registers(self):
-        """ allocate """
-        wfr_spec = self._wfr_spec
-        self._e_index_regs = wfr_spec.allocate_elec_registers()
-        self._n_index_regs = wfr_spec.allocate_nucl_registers()
-        self.add_param(("eregs", self._e_index_regs),
-                       ("nregs", self._n_index_regs))
-
-    def build_circuit_on(self, other_frame: heap.Frame):
-        """ Build the instructions on another compatible quantum circuit."""
-        stash_circuit = self._circuit
-        stash_tmp_allocator = self._temp_allocator
-        stash_ancilla_allocator = self._ancilla_allocator
-        self._circuit = other_frame.circuit
-        self._temp_allocator = other_frame._temp_allocator
-        self._ancilla_allocator = other_frame._ancilla_allocator
-        self.build_circuit()
-        self._circuit = stash_circuit
-        self._temp_allocator = stash_tmp_allocator
-        self._ancilla_allocator = stash_ancilla_allocator
-
-    def build_circuit(self):
-        """ build the gates for time evolution.
-            There are several variations for this.
-        """
-        qc = self.circuit
-        evo_spec = self._evo_spec
-
-        n_atom_it = evo_spec.num_atom_iterations
-        n_elec_it = evo_spec.num_elec_per_atom_iterations
-        with qc.for_loop(range(n_atom_it)):
-            with qc.for_loop(range(n_elec_it)):
-                if evo_spec.should_calculate_electron_motion:
-                    self._build_electron_motion_block()
-            if evo_spec.should_calculate_nucleus_motion:
-                self._build_nuclei_motion_block()
-
-    def _build_electron_motion_block(self):
-        if self._use_motion_block_gates:
-            elec_motion_block = ElectronMotionBlock(self._evo_spec)
-            logger.info("ElectronMotionBlock.num_qubits = %d", elec_motion_block.circuit.num_qubits)
-            with check_time("ElectronMotionBlock.invoke"):
-                self.invoke(elec_motion_block.bind(
-                    eregs=self._e_index_regs,
-                    nregs=self._n_index_regs
-                ), invoke_as_instruction=True)
-            return
-        # don't use the motion block gates.
-        elec_motion_block = ElectronMotionBlock(self._evo_spec, build=False)
-        elec_motion_block.build_circuit_on(self)
-
-    def _build_nuclei_motion_block(self):
-        if self._use_motion_block_gates:
-            nucl_motion_block = NucleusMotionBlock(self._evo_spec)
-            with check_time("NucleusMotionBlock.invoke"):
-                self.invoke(nucl_motion_block.bind(
-                    nregs=self._n_index_regs), invoke_as_instruction=True)
-            return
-        # don't use the motion block gates.
-        nucl_motion_block = NucleusMotionBlock(self._evo_spec, build=False)
-        qc = self.circuit
-        nucl_motion_block.build_circuit_on(self)
-
-    def bind(self,
-             eregs: List[List[QuantumRegister]],
-             nregs: List[List[QuantumRegister]]
-             ) -> heap.Binding:
-        """ bind arguments to a binding object """
-        arg_map = {
-            "eregs": eregs,
-            "nregs": nregs,
-        }
-        return heap.Binding(self, arg_map)
 
 
 class ElectronMotionBlock(heap.Frame):
@@ -183,10 +88,14 @@ class ElectronMotionBlock(heap.Frame):
         evo_spec = self._evo_spec
         if evo_spec.should_calculate_potential_term and wfr_spec.has_elec_potential_term:
             self._build_elec_potential_step()
+        else:
+            logger.info("Skipping electron potential term")
         if evo_spec.should_apply_qft:
             self._build_apply_electron_qft_step(inverse=True)
         if evo_spec.should_calculate_kinetic_term:
             self._build_elec_kinetic_step()
+        else:
+            logger.info("Skipping electron kinetic term")
         if evo_spec.should_apply_qft:
             self._build_apply_electron_qft_step()
 
@@ -358,11 +267,16 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         """ build the gates for time evolution.
             There are several variations for this.
         """
+        self._build_initialization_block()
+        evo_spec = self._evo_spec
+        if evo_spec.should_save_state_vector_per_atom_iteration:
+            self._build_time_evolution_circuit_with_save()
+        else:
+            self._build_time_evolution_circuit_without_save()
+
+    def _build_time_evolution_circuit_without_save(self):
         qc = self.circuit
         evo_spec = self._evo_spec
-
-        self._build_initialization_block()
-
         n_atom_it = evo_spec.num_atom_iterations
         n_elec_it = evo_spec.num_elec_per_atom_iterations
         with qc.for_loop(range(n_atom_it)):
@@ -371,6 +285,30 @@ class SuzukiTrotterMethodBlock(heap.Frame):
                     self._build_electron_motion_block()
             if evo_spec.should_calculate_nucleus_motion:
                 self._build_nuclei_motion_block()
+
+    def _build_time_evolution_circuit_with_save(self):
+        qc = self.circuit
+        evo_spec = self._evo_spec
+        n_atom_it = evo_spec.num_atom_iterations
+        n_elec_it = evo_spec.num_elec_per_atom_iterations
+        time = 0.0
+        delta_t = self._evo_spec.disc_spec.delta_t
+        # with qc.for_loop(range(n_atom_it)):
+        #     with qc.for_loop(range(n_elec_it)):
+        for _atom_it in range(n_atom_it):
+            for _elec_it in range(n_elec_it):
+                if evo_spec.should_calculate_electron_motion:
+                    self._build_electron_motion_block()
+                time += delta_t
+            if evo_spec.should_calculate_nucleus_motion:
+                self._build_nuclei_motion_block()
+            self._save_state_vector(time)
+
+    def _save_state_vector(self, time):
+        label = self._evo_spec.make_state_vector_label(time)
+        logger.info("save_statevector: %s", label)
+        self.circuit.save_statevector(label=label)
+
 
     def _build_initialization_block(self):
         if self._ene_spec.num_energy_configurations > 1:

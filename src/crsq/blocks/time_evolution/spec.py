@@ -17,6 +17,7 @@ class TimeEvolutionSpec:
                  disc_spec: discretization.DiscretizationSpec,
                  num_atom_iterations: int,
                  num_elec_per_atom_iterations: int,
+                 save_state_vector_per_atom_iteration: bool = False,
                  method=SUZUKI_TROTTER):
         self._ham_spec = ham_spec
         self._disc_spec = disc_spec
@@ -26,6 +27,7 @@ class TimeEvolutionSpec:
         self._should_calculate_nucleus_motion = True
         self._should_calculate_potential_term = True
         self._should_calculate_kinetic_term = True
+        self._should_save_state_vector_per_atom_iteration = save_state_vector_per_atom_iteration
         self._should_apply_qft = True
         valid_methods = [SUZUKI_TROTTER]
         if method not in valid_methods:
@@ -101,6 +103,19 @@ class TimeEvolutionSpec:
     def num_elec_per_atom_iterations(self) -> int:
         """ electron scale iterations per one atomic scale iteration """
         return self._num_elec_per_atom_iterations
+
+    @property
+    def should_save_state_vector_per_atom_iteration(self) -> bool:
+        """ flag that tells state vector should be saved per atom iteration """
+        return self._should_save_state_vector_per_atom_iteration
+    
+    def make_state_vector_file_name(self, time: float):
+        """ make state vector file name """
+        return f"state_vector_{time:04.3f}.csv"
+
+    def make_state_vector_label(self, time: float):
+        """ make state vector label """
+        return f"sv_t{time:04.3f}"
 
     @property
     def method(self):
