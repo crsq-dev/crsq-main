@@ -44,6 +44,7 @@ class HamiltonianSpec:
         self._should_apply_potential_to_phase = True
         self._should_revert_potential_ancilla_value = True
         self._should_mask_potential_singularity = False
+        self._should_use_div_bits_optimization = True
         self._nuclei_data = nuclei_data
         if wfr_spec.num_moving_nuclei ==0:
             self._max_particle_charge = 1.0
@@ -71,6 +72,11 @@ class HamiltonianSpec:
         """ set flag to mask potential division by zero """
         self._should_mask_potential_singularity = flag
         logger.info("HamiltonianSpec: should_mask_potential_singularity = %d", flag)
+    
+    def set_should_use_div_bits_optimization(self, flag):
+        """ set flag to mask potential division by zero """
+        self._should_use_div_bits_optimization = flag
+        logger.info("HamiltonianSpec: should_use_div_bits_optimization = %d", flag)
 
     @property
     def wfr_spec(self) -> wave_function.WaveFunctionRegisterSpec:
@@ -93,6 +99,11 @@ class HamiltonianSpec:
     def should_revert_potential_ancilla_value(self) -> bool:
         """ returns flag """
         return self._should_revert_potential_ancilla_value
+    
+    @property
+    def should_use_div_bits_optimization(self) -> bool:
+        """ returns flag """
+        return self._should_use_div_bits_optimization
 
     @property
     def nuclei_data(self) -> list[dict]:
@@ -188,8 +199,78 @@ class ElectronPotentialBlock(PotentialBlockBase):
         self._vx_const_numerator_reg = QuantumRegister(n + 1, "one")
         self.add_local(self._vx_const_numerator_reg)
         self._allocate_singularity_exchange_registers()
-
+    
     def build_circuits(self):
+        if self._ham_spec.should_use_div_bits_optimization:
+            self.build_circuits_optimized()
+        else:
+            self.build_circuits_original()
+
+    def build_circuits_optimized(self):
+        """ build circuits based on optimization based on
+            treating the division and rotation circuit as a unit
+            and allocating the extra bits as temporary bits local
+            to the unit.
+        """
+        ext_scope = ast.new_scope(self)
+
+        wfr_spec = self._wfr_spec
+        ham_spec = self._ham_spec
+        n = wfr_spec.num_coordinate_bits
+        m = ham_spec.num_v_numerator_int_bits
+        numerator_frac_bits = n + 1 - m
+        numerator_val = int(1.0 * (2**numerator_frac_bits))
+        qc = self.circuit
+        ari.set_value(qc, self._vx_const_numerator_reg, numerator_val)
+
+        dim = wfr_spec.dimension
+
+        # prepare AST registers for electron indices
+        ast_eregs: list[list[ast.QuantumValue]] = []
+        for ie in range(wfr_spec.num_electrons):
+            dims: list = []
+            for d in range(dim):
+                dims.append(ext_scope.register(self._eregs[ie][d], signed=True))
+            ast_eregs.append(dims)
+
+        # prepare AST registers for nucleus indices
+        ast_nregs = []
+        for ia in range(wfr_spec.num_moving_nuclei):
+            dims = []
+            for d in range(dim):
+                dims.append(ext_scope.register(self._nregs[ia][d], signed=True))
+            ast_nregs.append(dims)
+
+        # prepare AST constant nodes for stationary nucleus indices.
+        nuclei_data = self._ham_spec.nuclei_data
+        num_orbitals = wfr_spec.num_moving_nuclei
+        for ia in range(wfr_spec.num_stationary_nuclei):
+            ndata = nuclei_data[num_orbitals + ia]
+            dims = []
+            for d in range(dim):
+                pos = ndata["pos"]  # tuple or float
+                if isinstance(pos, tuple):
+                    q_d = ndata["pos"][d]
+                elif dim == 1:
+                    q_d = ndata["pos"]
+                else:
+                    raise ValueError("pos is not tuple")
+                dims.append(ext_scope.constant(q_d, n, signed=True))
+            ast_nregs.append(dims)
+
+        self._build_elec_elec_potential_terms_optimized(
+            ext_scope, ast_eregs)
+
+        self._build_elec_nucl_potential_terms_optimized(
+            ext_scope, ast_eregs, ast_nregs)
+
+        ext_scope.close()
+
+        # reset constant values
+        if ham_spec.should_revert_potential_ancilla_value:
+            ari.set_value(self.circuit, self._vx_const_numerator_reg, numerator_val)
+
+    def build_circuits_original(self):
         """ build circuits
         """
         scope = ast.new_scope(self)
@@ -249,6 +330,87 @@ class ElectronPotentialBlock(PotentialBlockBase):
         # reset constant values
         if ham_spec.should_revert_potential_ancilla_value:
             ari.set_value(self.circuit, self._vx_const_numerator_reg, numerator_val)
+
+    def _build_elec_elec_potential_terms_optimized(
+            self,
+            ex_scope: ast.Scope,
+            ast_eregs: list[list[ast.QuantumValue]]):
+        """ build e-e potential terms
+        """
+
+        wfr_spec = self._wfr_spec
+        ham_spec = self._ham_spec
+        should_mask_singularity = ham_spec.should_mask_potential_singularity
+        for ie in range(wfr_spec.num_electrons):
+            for ih in range(ie + 1, wfr_spec.num_electrons):
+                t1 = time.time()
+                ast_dist: ast.QuantumValue
+                if wfr_spec.dimension == 1:
+                    ast_e = ast_eregs[ie][0]
+                    ast_h = ast_eregs[ih][0]
+                    ast_e -= ast_h  # diff
+                    ast_dist =  ex_scope.abs(ast_e)
+                else:
+                    ast_squares = []
+                    for d in range(wfr_spec.dimension):
+                        ast_e = ast_eregs[ie][d]
+                        ast_h = ast_eregs[ih][d]
+                        ast_e -= ast_h  # diff
+                        ast_sq = ex_scope.square(ast_e)
+                        ast_squares.append(ast_sq)
+                        if d > 0:
+                            ast_squares[0] += ast_squares[d]  # sum
+                    ast_dist = ex_scope.square_root(ast_squares[0])
+
+                in_scope = ast.new_scope(self)
+                n = wfr_spec.num_coordinate_bits
+                m = ham_spec.num_v_numerator_int_bits
+                numerator_frac_bits = n + 1 - m
+
+                ex_scope.build_circuit()
+
+                iast_numerator = in_scope.register(self._vx_const_numerator_reg, numerator_frac_bits)
+                iast_dist = in_scope.register(ast_dist.register, ast_dist.fraction_bits)
+
+                if iast_dist.total_bits < iast_numerator.total_bits:
+                    pad_denominator = True
+                else:
+                    pad_denominator = False
+                if pad_denominator:
+                    total_bits = ast_dist.total_bits
+                    fraction_bits = ast_dist.fraction_bits
+                    high_bits = self.allocate_ancilla_bits(1, "msb")
+                    iast_dist2 = iast_dist.adjust_precision(total_bits+1, fraction_bits, new_high_bits=high_bits)
+                    iast_quotient = iast_numerator / iast_dist2 # inv
+                else:
+                    iast_quotient = iast_numerator / ast_dist
+                self.alias_regs['elec_elec_potential_quotient'] = iast_quotient.register
+                in_scope.build_circuit()
+                qq = -1.0*-1.0  # product of charges
+                # apply ratio to phase
+                if ham_spec.should_apply_potential_to_phase:
+                    # hide 1/r when r == 0
+                    if should_mask_singularity:
+                        self._build_set_diff0_reg(iast_dist.register)
+                        self._build_stash_quotient_on_diff0(iast_quotient.register)
+                    self._rotate_phase_by_register(iast_quotient.register, qq)
+                if ham_spec.should_revert_potential_ancilla_value:
+                    # restore the hidden 1/r
+                    if should_mask_singularity:
+                        self._build_stash_quotient_on_diff0(iast_quotient.register, reverse=True)
+                        self._build_set_diff0_reg(iast_dist.register)
+                    in_scope.build_inverse_circuit()
+                    in_scope.clear_operations()
+                    ex_scope.build_inverse_circuit()
+                ex_scope.clear_operations()
+                if pad_denominator:
+                    self.free_ancilla_bits(high_bits)
+                
+                in_scope.close()
+
+                dt = time.time() - t1
+                if dt > LOG_TIME_THRESH:
+                    logger.info("  Vee(%d,%d) done. %d msec", ie, ih, round(dt*1000))
 
     def _build_elec_elec_potential_terms(
             self,
@@ -316,6 +478,89 @@ class ElectronPotentialBlock(PotentialBlockBase):
                 dt = time.time() - t1
                 if dt > LOG_TIME_THRESH:
                     logger.info("  Vee(%d,%d) done. %d msec", ie, ih, round(dt*1000))
+
+    def _build_elec_nucl_potential_terms_optimized(
+            self,
+            ex_scope: ast.Scope,
+            ast_eregs: list[list[ast.QuantumValue]],
+            ast_nregs: list[list[ast.QuantumValue]]):
+
+        wfr_spec = self._wfr_spec
+        ham_spec = self._ham_spec
+        nuclei_data = ham_spec.nuclei_data
+        should_mask_singularity = ham_spec.should_mask_potential_singularity
+        for ia in range(wfr_spec.num_nuclei):
+            for ie in range(wfr_spec.num_electrons):
+                t1 = time.time()
+                qe = -1.0
+                qA = nuclei_data[ia]['charge']
+                ast_dist: ast.QuantumValue
+                if wfr_spec.dimension == 1:
+                    ast_e = ast_eregs[ie][0]
+                    ast_n = ast_nregs[ia][0]
+                    ast_e -= ast_n  # diff
+                    ast_dist = ex_scope.abs(ast_e)
+                else:
+                    ast_squares = []
+                    for d in range(wfr_spec.dimension):
+                        ast_e = ast_eregs[ie][d]
+                        ast_n = ast_nregs[ia][d]
+                        ast_e -= ast_n  # diff
+                        ast_sq = ex_scope.square(ast_e)
+                        ast_squares.append(ast_sq)
+                        if d > 0:
+                            ast_squares[0] += ast_squares[d]  # sum
+                    ast_dist = ex_scope.square_root(ast_squares[0])
+                
+                in_scope = ast.new_scope(self)
+                n = wfr_spec.num_coordinate_bits
+                m = ham_spec.num_v_numerator_int_bits
+                numerator_frac_bits = n + 1 - m
+
+                ex_scope.build_circuit()
+
+                iast_numerator = in_scope.register(self._vx_const_numerator_reg, numerator_frac_bits)
+                iast_dist = in_scope.register(ast_dist.register, ast_dist.fraction_bits)
+
+                if iast_dist.total_bits < iast_numerator.total_bits:
+                    pad_denominator = True
+                else:
+                    pad_denominator = False
+                if pad_denominator:
+                    total_bits = ast_dist.total_bits
+                    fraction_bits = ast_dist.fraction_bits
+                    high_bits = self.allocate_ancilla_bits(1, "msb")
+                    iast_dist2 = iast_dist.adjust_precision(total_bits+1, fraction_bits, new_high_bits=high_bits)
+                    iast_quotient = iast_numerator / iast_dist2 # inv
+                else:
+                    iast_quotient = iast_numerator / ast_dist
+                self.alias_regs['elec_nucl_potential_quotient'] = iast_quotient.register
+                in_scope.build_circuit()
+                qq = qe*qA  # product of charges
+                # apply ratio to phase
+                if ham_spec.should_apply_potential_to_phase:
+                    # hide 1/r when r == 0
+                    if should_mask_singularity:
+                        self._build_set_diff0_reg(iast_dist.register)
+                        self._build_stash_quotient_on_diff0(iast_quotient.register)
+                    self._rotate_phase_by_register(iast_quotient.register, qq)
+                if ham_spec.should_revert_potential_ancilla_value:
+                    # restore the hidden 1/r
+                    if should_mask_singularity:
+                        self._build_stash_quotient_on_diff0(iast_quotient.register, reverse=True)
+                        self._build_set_diff0_reg(iast_dist.register)
+                    in_scope.build_inverse_circuit()
+                    in_scope.clear_operations()
+                    ex_scope.build_inverse_circuit()
+                ex_scope.clear_operations()
+                if pad_denominator:
+                    self.free_ancilla_bits(high_bits)
+
+                in_scope.close()
+
+                dt = time.time() - t1
+                if dt > LOG_TIME_THRESH:
+                    logger.info("  VeA(%d,%d) done. %d ms", ie, ia, round(dt*1000))
 
     def _build_elec_nucl_potential_terms(
             self,
