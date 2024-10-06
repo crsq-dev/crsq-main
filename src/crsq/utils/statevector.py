@@ -92,6 +92,7 @@ def extract_dist2_sub(sv: Statevector, xfrom: int, xto: int,
                       yfrom: int, yto: int,
                       eps:float = 1.0e-10) -> np.ndarray:
     """ Extract distribution indexed by a given bit range spec.
+        returns data[x, y]
     """
     x_bitcount = xto - xfrom
     num_xdata = 2**x_bitcount
@@ -108,13 +109,43 @@ def extract_dist2_sub(sv: Statevector, xfrom: int, xto: int,
             print(f"dists[{x_index}][{y_index}]+={z} => {dists[x_index,y_index]}")
     return dists
 
+def extract_dist2d_from_file_sub(path: str, xfrom: int, xto: int, yfrom: int, yto: int) -> Statevector:
+    """ Read a statevector from a file created by save_to_file.
+        Produce a 2-d array indexed by x, y
+    """
+    x_bitcount = xto - xfrom
+    num_xdata = 2**x_bitcount
+    y_bitcount = yto - yfrom
+    num_ydata = 2**y_bitcount
+    dists = np.zeros((num_xdata,num_ydata), dtype=np.complex128)
+    with open(path, "r", encoding="utf-8") as f:
+        d = int(f.readline())
+        ixfrom = d - xfrom
+        ixto = d - xto
+        iyfrom = d - yfrom
+        iyto = d - yto
+        for line in f:
+            cols = line.split(',')
+            key = cols[0]
+            xbits = key[ixto:ixfrom]
+            xval = int(xbits, base=2)
+            ybits = key[iyto:iyfrom]
+            yval = int(ybits, base=2)
+            re = float(cols[1])
+            im = float(cols[2])
+            z = re + im * 1j
+            dists[xval, yval] = dists[xval,yval] + z
+    return dists
+
+
 def extract_dist(qc: QuantumCircuit, sv: Statevector, data_reg: str, eps=1.0e-12) -> np.ndarray:
     """ make a 2-d array indexed by group_reg, data_reg
+        returns data[x]
     """
     reg_map = {}
     acc = 0
     for reg in qc.qregs:
-        reg_map[reg.name] = (acc, acc + reg.size)
+        reg_map[reg.name] = (acc, acc + reg.size) # start bit, stop bit + 1
         acc += reg.size
     dreg = reg_map[data_reg]
     return extract_dist_sub(sv, dreg[0], dreg[1], eps)
@@ -130,6 +161,18 @@ def extract_dist2d(qc: QuantumCircuit, sv: Statevector, xreg: str, yreg: str, ep
     xb = reg_map[xreg]
     yb = reg_map[yreg]
     return extract_dist2_sub(sv, xb[0], xb[1], yb[0], yb[1], eps)
+
+def extract_dist2d_from_file(qc: QuantumCircuit, path: str, xreg: str, yreg: str) -> np.ndarray:
+    """ make a 2-d array indexed by group_reg, data_reg
+    """
+    reg_map = {}
+    acc = 0
+    for reg in qc.qregs:
+        reg_map[reg.name] = (acc, acc + reg.size)
+        acc += reg.size
+    xb = reg_map[xreg]
+    yb = reg_map[yreg]
+    return extract_dist2d_from_file_sub(path, xb[0], xb[1], yb[0], yb[1])
 
 def _extract_int(x: int, bits: tuple[int], signed: bool, frac_bits=0) -> int:
     s: int = 0
