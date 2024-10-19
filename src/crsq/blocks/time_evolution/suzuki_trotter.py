@@ -295,6 +295,11 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         delta_t = self._evo_spec.disc_spec.delta_t
         # with qc.for_loop(range(n_atom_it)):
         #     with qc.for_loop(range(n_elec_it)):
+
+        # cannot save state vector for t=0.
+        # we need to go through the circuit one loop to get all registers allocated.
+        # self._save_state_vector(time)
+
         for _atom_it in range(n_atom_it):
             for _elec_it in range(n_elec_it):
                 if evo_spec.should_calculate_electron_motion:
