@@ -180,14 +180,14 @@ class RadialFuncQrom(Frame):
                 if k == n - 1:
                     qc.x(self._wx[k])
                 else:
-                    qc.cx(self._wy[k+1], self._wx[k], ctrl_state= "0")
+                    qc.cx(self._wy[k+1], self._wx[k])
                 # do the lower half
                 self._build_area_x_low(xi,yi,k)
                 # reset focus
                 if k == n - 1:
                     qc.x(self._wx[k])
                 else:
-                    qc.cx(self._wy[k+1], self._wx[k], ctrl_state="0")
+                    qc.cx(self._wy[k+1], self._wx[k])
         else:
             if self._has_data_x[k, xi*2+1, yi]:
                 # only x high has data.
@@ -195,7 +195,7 @@ class RadialFuncQrom(Frame):
                 if k == n - 1:
                     qc.x(self._wx[k])
                 else:
-                    qc.cx(self._wy[k+1], self._wx[k], ctrl_state= "1")
+                    qc.cx(self._wy[k+1], self._wx[k])
                 # do the lower half
                 self._build_area_x_low(xi,yi,k)
                 # switch focus to upper half
@@ -209,7 +209,7 @@ class RadialFuncQrom(Frame):
                 if k == n - 1:
                     qc.x(self._wx[k])
                 else:
-                    qc.cx(self._wy[k+1], self._wx[k], ctrl_state="1")
+                    qc.cx(self._wy[k+1], self._wx[k])
             else:
                 # x low and x high both have no data.
                 # does not come here.
@@ -229,15 +229,15 @@ class RadialFuncQrom(Frame):
                     qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='11')
                 else:
                     # only y low has data
-                    qc.cx(self._wx[k], self._wy[k], ctrl_state='0')
+                    qc.cx(self._wx[k], self._wy[k])
                     self._build_area(xi*2, yi*2, k-1)
-                    qc.cx(self._wx[k], self._wy[k], ctrl_state='0')
+                    qc.cx(self._wx[k], self._wy[k])
             else:
                 if self._has_data_y[k, xi*2, yi*2+1]:
                     # only y high has data
-                    qc.cx(self._wx[k], self._wy[k], ctrl_state='1')
+                    qc.cx(self._wx[k], self._wy[k])
                     self._build_area(xi*2, yi*2+1, k-1)
-                    qc.cx(self._wx[k], self._wy[k], ctrl_state='1')
+                    qc.cx(self._wx[k], self._wy[k])
                 else:
                     # y low and y high both have no data.
                     # does not come here.
@@ -275,15 +275,15 @@ class RadialFuncQrom(Frame):
                     qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='11')
                 else:
                     # only y low has data
-                    qc.cx(self._wx[k], self._wy[k], ctrl_state='0')
+                    qc.cx(self._wx[k], self._wy[k])
                     self._build_area(xi*2+1, yi*2, k-1)
-                    qc.cx(self._wx[k], self._wy[k], ctrl_state='0')
+                    qc.cx(self._wx[k], self._wy[k])
             else:
                 if self._has_data_y[k, xi*2+1, yi*2+1]:
                     # only y high has data
-                    qc.cx(self._wx[k], self._wy[k], ctrl_state='1')
+                    qc.cx(self._wx[k], self._wy[k])
                     self._build_area(xi*2+1, yi*2+1, k-1)
-                    qc.cx(self._wx[k], self._wy[k], ctrl_state='1')
+                    qc.cx(self._wx[k], self._wy[k])
                 else:
                     # y low and y high both have no data.
                     # does not come here.
