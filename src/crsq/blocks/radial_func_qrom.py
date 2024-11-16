@@ -151,6 +151,13 @@ class RadialFuncQrom(Frame):
         qc = self.circuit
         n = self._n
 
+        # In this method we inspect the data occupancy along the x axis
+        # and see if the first half and second half is empty or not.
+        # If both halves have data, the standard sequence is followed.
+        # If only half is occupied, a shortcut sequence is followed.
+        # For cases where both halves are empty, this function will
+        # not be called.
+
         if self._has_data_x[k, xi*2, yi]:
             if self._has_data_x[k, xi*2+1, yi]:
                 # both x low and x high have data

@@ -115,12 +115,12 @@ class Simulator(heap.Frame):
     def _build_time_evolution_block(self):
         """ build time evolution block"""
         evo_spec = self._evo_spec
-        if evo_spec.method == time_evolution.SUZUKI_TROTTER:
+        if evo_spec.method == time_evolution.SUZUKI_TROTTER_ARITHMETIC:
             self._build_time_evolution_with_suzuki_trotter()
     
     def _build_time_evolution_with_suzuki_trotter(self):
         if self._use_motion_block_gates:
-            st_block = time_evolution.SuzukiTrotterIntegrator(self._evo_spec)
+            st_block = time_evolution.SuzukiTrotterMethodBlock(self._evo_spec, self._ene_spec, self._asy_spec)
             with check_time("SuzukiTrotterIntegrator.invoke"):
                 self.invoke(
                     st_block.bind(
@@ -130,6 +130,6 @@ class Simulator(heap.Frame):
                     invoke_as_instruction=True
                 )
             return
-        st_block = time_evolution.SuzukiTrotterIntegrator(self._evo_spec, use_motion_block_gates=False)
+        st_block = time_evolution.SuzukiTrotterMethodBlock(self._evo_spec, self._ene_spec, self._asy_spec, use_motion_block_gates=False)
         st_block.build_circuit_on(self)
         

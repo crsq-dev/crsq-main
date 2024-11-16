@@ -2,10 +2,11 @@
 """
 from qiskit.circuit import Parameter
 from crsq.blocks import (
-    hamiltonian, discretization, wave_function
+    hamiltonian, discretization, wave_function, rfqhamiltonian
 )
 
-SUZUKI_TROTTER='ST'
+SUZUKI_TROTTER_ARITHMETIC='STAR'
+SUZUKI_TROTTER_QROM='STQR'
 
 class TimeEvolutionSpec:
     """ Time Evolution block parameters
@@ -14,12 +15,20 @@ class TimeEvolutionSpec:
     """
     def __init__(self,
                  ham_spec: hamiltonian.HamiltonianSpec,
+                 rfq_spec: rfqhamiltonian.RfqPotentialSpec,
                  disc_spec: discretization.DiscretizationSpec,
                  num_atom_iterations: int,
                  num_elec_per_atom_iterations: int,
                  save_state_vector_per_atom_iteration: bool = False,
-                 method=SUZUKI_TROTTER):
+                 method=SUZUKI_TROTTER_ARITHMETIC):
+        assert isinstance(ham_spec, hamiltonian.HamiltonianSpec)
+        assert isinstance(rfq_spec, rfqhamiltonian.RfqPotentialSpec)
+        assert isinstance(disc_spec, discretization.DiscretizationSpec)
+        assert isinstance(num_atom_iterations, int)
+        assert isinstance(num_elec_per_atom_iterations, int)
+        
         self._ham_spec = ham_spec
+        self._rfq_spec = rfq_spec
         self._disc_spec = disc_spec
         self._num_atom_iterations = num_atom_iterations
         self._num_elec_per_atom_iterations = num_elec_per_atom_iterations
@@ -29,7 +38,7 @@ class TimeEvolutionSpec:
         self._should_calculate_kinetic_term = True
         self._should_save_state_vector_per_atom_iteration = save_state_vector_per_atom_iteration
         self._should_apply_qft = True
-        valid_methods = [SUZUKI_TROTTER]
+        valid_methods = [SUZUKI_TROTTER_ARITHMETIC, SUZUKI_TROTTER_QROM]
         if method not in valid_methods:
             raise ValueError(f"method must be one of {valid_methods}")
         self._method = method
@@ -38,6 +47,11 @@ class TimeEvolutionSpec:
     def ham_spec(self) -> hamiltonian.HamiltonianSpec:
         """ Hamiltonian spec"""
         return self._ham_spec
+
+    @property
+    def rfq_spec(self) -> rfqhamiltonian.RfqPotentialSpec:
+        """ rfq potential spec """
+        return self._rfq_spec
 
     @property
     def wfr_spec(self) -> wave_function.WaveFunctionRegisterSpec:
