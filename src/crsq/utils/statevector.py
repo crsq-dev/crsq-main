@@ -362,6 +362,52 @@ def extract_arithmetic_result_2d_bars(
     rdz = np.array(dz)
     return (ra, rb, rc, rdz)
 
+def extract_arithmetic_result_2dphase_bars(
+        rs: heap.Frame, sv: Statevector,
+        a_bit_spec: ast.QuantumValue,
+        b_bit_spec: ast.QuantumValue,
+        eps=1.0e-10, print_states: bool=False):
+    """ extract (a,b) -> c style data for a bar3d plot
+
+        :param rs: the RegisterSet where the state vector belongs
+        :param sv: the state vector to analyze
+        :param a_bit_spec: the AST node for a
+        :param b_bit_spec: the AST node for b
+        :param c_bit_spec: the AST node for c
+        :return: (x, y, z, dz)
+    """
+    n = sv.num_qubits
+    ba = _get_bits_from_register(rs, a_bit_spec)
+    bb = _get_bits_from_register(rs, b_bit_spec)
+    # asigned = _get_signed_flag_from_bit_spec(a_bit_spec)
+    # bsigned = _get_signed_flag_from_bit_spec(b_bit_spec)
+    asigned = True
+    bsigned = True
+    nba = len(ba)
+    nbb = len(bb)
+    bottom = 0
+    a = []
+    b = []
+    c = []
+    dz = []
+    for k, z in enumerate(sv.data):
+        if abs(z) > eps:
+            a_index = _extract_int(k, ba, asigned)
+            b_index = _extract_int(k, bb, bsigned)
+            c_index = cmath.phase(z)
+            a.append(a_index)
+            b.append(b_index)
+            c.append(bottom)
+            dz.append(c_index-bottom)
+            if print_states:
+                print(bin((1<<n) + k)[-n:], bin((1<<nba)+a_index)[-nba:],
+                    bin((1<<nbb)+b_index)[-nbb:])
+    ra = np.array(a)
+    rb = np.array(b)
+    rc = np.array(c)
+    rdz = np.array(dz)
+    return (ra, rb, rc, rdz)
+
 
 def dump_statevector(sv: Statevector, qc: QuantumCircuit, eps:float = 1e-12, global_phase=0):
     """ Dump a state vector
