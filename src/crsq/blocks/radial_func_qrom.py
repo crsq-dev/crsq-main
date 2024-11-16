@@ -168,19 +168,28 @@ class RadialFuncQrom(Frame):
             # low low
             if k > 0:
                 if self._has_data_y[k, xi*2, yi*2]:
-                    qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='01')
-                    self._build_area(xi*2, yi*2, k-1)
+                    if self._has_data_y[k, xi*2, yi*2+1]:
+                        # both y low and y high have data
+                        qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='01')
+                        self._build_area(xi*2, yi*2, k-1)
+                        qc.cx(self._wx[k], self._wy[k])
+                        self._build_area(xi*2, yi*2+1, k-1)
+                        qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='11')
+                    else:
+                        # only y low has data
+                        qc.cx(self._wx[k], self._wy[k], ctrl_state='0')
+                        self._build_area(xi*2, yi*2, k-1)
+                        qc.cx(self._wx[k], self._wy[k], ctrl_state='0')
                 else:
-                    qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='11')
-
-                if self._has_data_y[k, xi*2, yi*2] and self._has_data_y[k, xi*2, yi*2+1]:
-                    qc.cx(self._wx[k], self._wy[k])
-
-                if self._has_data_y[k, xi*2, yi*2+1]:
-                    self._build_area(xi*2, yi*2+1, k-1)
-                    qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='11')
-                else:
-                    qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='01')
+                    if self._has_data_y[k, xi*2, yi*2+1]:
+                        # only y high has data
+                        qc.cx(self._wx[k], self._wy[k], ctrl_state='1')
+                        self._build_area(xi*2, yi*2+1, k-1)
+                        qc.cx(self._wx[k], self._wy[k], ctrl_state='1')
+                    else:
+                        # y low and y high both have no data.
+                        # does not come here.
+                        print("Error: no data for x low half")
             else:
                 # later bit comes first
                 v = self._data[xi*2, yi*2+1]
@@ -212,19 +221,28 @@ class RadialFuncQrom(Frame):
         if self._has_data_x[k, xi*2+1, yi]:
             if k > 0:
                 if self._has_data_y[k, xi*2+1, yi*2]:
-                    qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='01')
-                    self._build_area(xi*2+1, yi*2, k-1)
+                    if self._has_data_y[k, xi*2+1, yi*2+1]:
+                        # both y low and y high have data
+                        qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='01')
+                        self._build_area(xi*2+1, yi*2, k-1)
+                        qc.cx(self._wx[k], self._wy[k])
+                        self._build_area(xi*2+1, yi*2+1, k-1)
+                        qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='11')
+                    else:
+                        # only y low has data
+                        qc.cx(self._wx[k], self._wy[k], ctrl_state='0')
+                        self._build_area(xi*2+1, yi*2, k-1)
+                        qc.cx(self._wx[k], self._wy[k], ctrl_state='0')
                 else:
-                    qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='11')
-
-                if self._has_data_y[k, xi*2+1, yi*2] and self._has_data_y[k, xi*2+1, yi*2+1]:
-                    qc.cx(self._wx[k], self._wy[k])
-
-                if self._has_data_y[k, xi*2+1, yi*2+1]:
-                    self._build_area(xi*2+1, yi*2+1, k-1)
-                    qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='11')
-                else:
-                    qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='01')
+                    if self._has_data_y[k, xi*2+1, yi*2+1]:
+                        # only y high has data
+                        qc.cx(self._wx[k], self._wy[k], ctrl_state='1')
+                        self._build_area(xi*2+1, yi*2+1, k-1)
+                        qc.cx(self._wx[k], self._wy[k], ctrl_state='1')
+                    else:
+                        # y low and y high both have no data.
+                        # does not come here.
+                        print("Error: no data for x high half")
             else:
                 v = self._data[xi*2+1, yi*2]
                 # cancels with low half
