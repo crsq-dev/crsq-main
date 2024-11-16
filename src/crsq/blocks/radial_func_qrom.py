@@ -152,127 +152,160 @@ class RadialFuncQrom(Frame):
         n = self._n
 
         if self._has_data_x[k, xi*2, yi]:
-            cs = '0'
-        else:
-            cs = '1'
-
-        if k == n - 1:
-            qc.cx(self._x[k], self._wx[k], ctrl_state=cs)
-        else:
-            qc.ccx(self._wy[k+1], self._x[k], self._wx[k], ctrl_state= cs + "1")
-        # qc.ccx(self._wy[k+1], self._x[k], self._wx[k], ctrl_state= cs + "1")
-
-        # begin low half
-
-        if self._has_data_x[k, xi*2, yi]:
-            # low low
-            if k > 0:
-                if self._has_data_y[k, xi*2, yi*2]:
-                    if self._has_data_y[k, xi*2, yi*2+1]:
-                        # both y low and y high have data
-                        qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='01')
-                        self._build_area(xi*2, yi*2, k-1)
-                        qc.cx(self._wx[k], self._wy[k])
-                        self._build_area(xi*2, yi*2+1, k-1)
-                        qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='11')
-                    else:
-                        # only y low has data
-                        qc.cx(self._wx[k], self._wy[k], ctrl_state='0')
-                        self._build_area(xi*2, yi*2, k-1)
-                        qc.cx(self._wx[k], self._wy[k], ctrl_state='0')
+            if self._has_data_x[k, xi*2+1, yi]:
+                # both x low and x high have data
+                # focus on lower half.
+                if k == n - 1:
+                    qc.cx(self._x[k], self._wx[k], ctrl_state="0")
                 else:
-                    if self._has_data_y[k, xi*2, yi*2+1]:
-                        # only y high has data
-                        qc.cx(self._wx[k], self._wy[k], ctrl_state='1')
-                        self._build_area(xi*2, yi*2+1, k-1)
-                        qc.cx(self._wx[k], self._wy[k], ctrl_state='1')
-                    else:
-                        # y low and y high both have no data.
-                        # does not come here.
-                        print("Error: no data for x low half")
+                    qc.ccx(self._wy[k+1], self._x[k], self._wx[k], ctrl_state="01")
+                # do the lower half
+                self._build_area_x_low(xi,yi,k)
+                # middle.
+                # switch focus to upper half
+                if k == n - 1:
+                    qc.x(self._wx[k])
+                else:
+                    qc.cx(self._wy[k+1], self._wx[k])
+                # do the upper half
+                self._build_area_x_high(xi,yi,k)
+                # reset focus
+                if k == n - 1:
+                    qc.cx(self._x[k], self._wx[k], ctrl_state="1")
+                else:
+                    qc.ccx(self._wy[k+1], self._x[k], self._wx[k], ctrl_state="11")
             else:
-                # later bit comes first
-                v = self._data[xi*2, yi*2+1]
-                if v != 0.0:
-                    qc.cp(v, self._wx[0], self._y[0])
-
-                # earlier bit comes second
-                v = self._data[xi*2, yi*2]
-                # cancels with high half:
-                if self._has_data_x[k, xi*2+1, yi]:
-                    qc.x(self._y[0])
-                    if v != 0.0:
-                        qc.cp(v, self._wx[0], self._y[0])
-                        pass
+                # only x low has data
+                # focus on lower half.
+                if k == n - 1:
+                    qc.x(self._wx[k])
                 else:
-                    if v != 0.0:
-                        qc.x(self._y[0])
-                        qc.cp(v, self._wx[0], self._y[0])
-                        qc.x(self._y[0])
-
-        # end low half
-        if self._has_data_x[k, xi*2, yi] and self._has_data_x[k, xi*2+1, yi]:
-            if k == n - 1:
-                qc.x(self._wx[k])
-            else:
-                qc.cx(self._wy[k+1], self._wx[k]) # middle
-        # begin high half
-
-        if self._has_data_x[k, xi*2+1, yi]:
-            if k > 0:
-                if self._has_data_y[k, xi*2+1, yi*2]:
-                    if self._has_data_y[k, xi*2+1, yi*2+1]:
-                        # both y low and y high have data
-                        qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='01')
-                        self._build_area(xi*2+1, yi*2, k-1)
-                        qc.cx(self._wx[k], self._wy[k])
-                        self._build_area(xi*2+1, yi*2+1, k-1)
-                        qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='11')
-                    else:
-                        # only y low has data
-                        qc.cx(self._wx[k], self._wy[k], ctrl_state='0')
-                        self._build_area(xi*2+1, yi*2, k-1)
-                        qc.cx(self._wx[k], self._wy[k], ctrl_state='0')
+                    qc.cx(self._wy[k+1], self._wx[k], ctrl_state= "0")
+                # do the lower half
+                self._build_area_x_low(xi,yi,k)
+                # reset focus
+                if k == n - 1:
+                    qc.x(self._wx[k])
                 else:
-                    if self._has_data_y[k, xi*2+1, yi*2+1]:
-                        # only y high has data
-                        qc.cx(self._wx[k], self._wy[k], ctrl_state='1')
-                        self._build_area(xi*2+1, yi*2+1, k-1)
-                        qc.cx(self._wx[k], self._wy[k], ctrl_state='1')
-                    else:
-                        # y low and y high both have no data.
-                        # does not come here.
-                        print("Error: no data for x high half")
-            else:
-                v = self._data[xi*2+1, yi*2]
-                # cancels with low half
-                if self._has_data_x[k, xi*2, yi]:
-                    if v != 0.0:
-                        qc.cp(v, self._wx[0], self._y[0])
-                        pass
-                    qc.x(self._y[0])
-                else:
-                    if v != 0.0:
-                        qc.x(self._y[0])
-                        qc.cp(v, self._wx[0], self._y[0])
-                        qc.x(self._y[0])
-
-                v = self._data[xi*2+1, yi*2+1]
-                if v != 0.0:
-                    qc.cp(v, self._wx[0], self._y[0])
-
-        # end high half
-        if self._has_data_x[k, xi*2+1, yi]:
-            cs = '1'
+                    qc.cx(self._wy[k+1], self._wx[k], ctrl_state="0")
         else:
-            cs = '0'
+            if self._has_data_x[k, xi*2+1, yi]:
+                # only x high has data.
+                # set focus.
+                if k == n - 1:
+                    qc.x(self._wx[k])
+                else:
+                    qc.cx(self._wy[k+1], self._wx[k], ctrl_state= "1")
+                # do the lower half
+                self._build_area_x_low(xi,yi,k)
+                # switch focus to upper half
+                if k == n - 1:
+                    qc.x(self._wx[k])
+                else:
+                    qc.cx(self._wy[k+1], self._wx[k]) # middle
+                # do the upper half
+                self._build_area_x_high(xi,yi,k)
+                # reset focus
+                if k == n - 1:
+                    qc.x(self._wx[k])
+                else:
+                    qc.cx(self._wy[k+1], self._wx[k], ctrl_state="1")
+            else:
+                # x low and x high both have no data.
+                # does not come here.
+                print("Error: no data for x low half")
 
-        if k == n - 1:
-            qc.cx(self._x[k], self._wx[k], ctrl_state=cs)
-        else:
-            qc.ccx(self._wy[k+1], self._x[k], self._wx[k], ctrl_state=cs+"1")
-        # qc.ccx(self._wy[k+1], self._x[k], self._wx[k], ctrl_state=cs+"1")
     
+    def _build_area_x_low(self, xi, yi, k):
+        qc = self.circuit
+        if k > 0:
+            if self._has_data_y[k, xi*2, yi*2]:
+                if self._has_data_y[k, xi*2, yi*2+1]:
+                    # both y low and y high have data
+                    qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='01')
+                    self._build_area(xi*2, yi*2, k-1)
+                    qc.cx(self._wx[k], self._wy[k])
+                    self._build_area(xi*2, yi*2+1, k-1)
+                    qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='11')
+                else:
+                    # only y low has data
+                    qc.cx(self._wx[k], self._wy[k], ctrl_state='0')
+                    self._build_area(xi*2, yi*2, k-1)
+                    qc.cx(self._wx[k], self._wy[k], ctrl_state='0')
+            else:
+                if self._has_data_y[k, xi*2, yi*2+1]:
+                    # only y high has data
+                    qc.cx(self._wx[k], self._wy[k], ctrl_state='1')
+                    self._build_area(xi*2, yi*2+1, k-1)
+                    qc.cx(self._wx[k], self._wy[k], ctrl_state='1')
+                else:
+                    # y low and y high both have no data.
+                    # does not come here.
+                    print("Error: no data for x low half")
+        else:
+            # later bit comes first
+            v = self._data[xi*2, yi*2+1]
+            if v != 0.0:
+                qc.cp(v, self._wx[0], self._y[0])
+
+            # earlier bit comes second
+            v = self._data[xi*2, yi*2]
+            # cancels with high half:
+            if self._has_data_x[k, xi*2+1, yi]:
+                qc.x(self._y[0])
+                if v != 0.0:
+                    qc.cp(v, self._wx[0], self._y[0])
+                    pass
+            else:
+                if v != 0.0:
+                    qc.x(self._y[0])
+                    qc.cp(v, self._wx[0], self._y[0])
+                    qc.x(self._y[0])
+
+    def _build_area_x_high(self, xi, yi, k):
+        qc = self.circuit
+        if k > 0:
+            if self._has_data_y[k, xi*2+1, yi*2]:
+                if self._has_data_y[k, xi*2+1, yi*2+1]:
+                    # both y low and y high have data
+                    qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='01')
+                    self._build_area(xi*2+1, yi*2, k-1)
+                    qc.cx(self._wx[k], self._wy[k])
+                    self._build_area(xi*2+1, yi*2+1, k-1)
+                    qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='11')
+                else:
+                    # only y low has data
+                    qc.cx(self._wx[k], self._wy[k], ctrl_state='0')
+                    self._build_area(xi*2+1, yi*2, k-1)
+                    qc.cx(self._wx[k], self._wy[k], ctrl_state='0')
+            else:
+                if self._has_data_y[k, xi*2+1, yi*2+1]:
+                    # only y high has data
+                    qc.cx(self._wx[k], self._wy[k], ctrl_state='1')
+                    self._build_area(xi*2+1, yi*2+1, k-1)
+                    qc.cx(self._wx[k], self._wy[k], ctrl_state='1')
+                else:
+                    # y low and y high both have no data.
+                    # does not come here.
+                    print("Error: no data for x high half")
+        else:
+            v = self._data[xi*2+1, yi*2]
+            # cancels with low half
+            if self._has_data_x[k, xi*2, yi]:
+                if v != 0.0:
+                    qc.cp(v, self._wx[0], self._y[0])
+                    pass
+                qc.x(self._y[0])
+            else:
+                if v != 0.0:
+                    qc.x(self._y[0])
+                    qc.cp(v, self._wx[0], self._y[0])
+                    qc.x(self._y[0])
+
+            v = self._data[xi*2+1, yi*2+1]
+            if v != 0.0:
+                qc.cp(v, self._wx[0], self._y[0])
+
     def bind(self, x:QuantumRegister, y:QuantumRegister):
         return Binding(self, {"x": x, "y": y})
 
