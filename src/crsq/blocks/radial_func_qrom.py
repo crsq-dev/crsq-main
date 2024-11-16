@@ -42,15 +42,19 @@ class RadialFuncQrom(Frame):
             logger.info("end  : RadialFuncQrom() %f msec", round(dt*1000))
     
     def _prepare_data(self):
+        # for a n bit x, abs(x) results as values 0 to 2^(n-1)
+        # The values required is for 0 to 2^(n-1), which is 2^(n-1)+1 values.
+        # We prepare a table sized 2^n, and use the range [0,0] to [2^(n-1), 2^(n-1)].
         n = self._n
-        M = 2**(n-1)
+        M = 2**n
+        HM = M //2
         self._data = np.ndarray((M, M), dtype=float)
-        self._has_data_y = np.ndarray((n-1, M, M), dtype=int)
-        self._has_data_x = np.ndarray((n-1, M, M), dtype=int)
+        self._has_data_y = np.ndarray((n, M, M), dtype=int)
+        self._has_data_x = np.ndarray((n, M, M), dtype=int)
         for j in range(M):
             y = j * self._dq
             for i in range(M):
-                if j <= i:
+                if j <= i and i < HM + 1:
                     x = i * self._dq
                     r = math.sqrt(x*x + y*y)
                     self._data[i, j] = self._rfunc(r)
@@ -58,7 +62,7 @@ class RadialFuncQrom(Frame):
                 else:
                     self._has_data_y[0, i, j] = 0
         w = M
-        for k in range(0, n-2):
+        for k in range(0, n-1):
             for j in range(0, w//2):
                 for i in range(0, w):
                     self._has_data_x[k, i, j] = self._has_data_y[k, i, 2*j] or self._has_data_y[k, i, 2*j+1]
@@ -66,12 +70,12 @@ class RadialFuncQrom(Frame):
                 for i in range(0, w//2):
                     self._has_data_y[k+1, i, j] = self._has_data_x[k, 2*i, j] or self._has_data_x[k, 2*i+1, j]
             w = w//2
-        k = n-2
+        k = n-1
         for j in range(0, w//2):
             for i in range(0, w):
                 self._has_data_x[k, i, j] = self._has_data_y[k, i, 2*j] or self._has_data_y[k, i, 2*j+1]
         w = M
-        for k in range(n-1):
+        for k in range(n):
             print(f"has_data_y[{k}]")
             for j in range(w):
                 print(self._has_data_y[k, :w, j])
@@ -119,17 +123,15 @@ class RadialFuncQrom(Frame):
         qc.append(ari.absolute_gate(n), self._x[:] + self._sx[:] + self._cr[:])
         qc.append(ari.absolute_gate(n), self._y[:] + self._sy[:] + self._cr[:])
         qc.append(ari.cdk_comparator_gate(n), self._y[:] + self._x[:] + self._cz[:] + self._cr[0:1])
-        for i in range(n-1):
+        for i in range(n):
             qc.cswap(self._cz[0], self._x[i], self._y[i])
         xi = 0
         yi = 0
-        k = n - 2
+        k = n - 1
 
-        qc.ccx(self._x[n-1], self._y[n-1], self._wy[n-1], ctrl_state='00')
         self._build_area(xi, yi, k)
-        qc.ccx(self._x[n-1], self._y[n-1], self._wy[n-1], ctrl_state='00')
 
-        for i in range(n-2,-1,-1):
+        for i in range(n-1,-1,-1):
             qc.cswap(self._cz[0], self._x[i], self._y[i])
 
         cmp_dag_gate = ari.cdk_comparator_gate(n).inverse()
@@ -154,11 +156,11 @@ class RadialFuncQrom(Frame):
         else:
             cs = '1'
 
-        # if k == n - 2:
-        #     qc.cx(self._x[k], self._wx[k], ctrl_state=cs)
-        # else:
-        #     qc.ccx(self._wy[k+1], self._x[k], self._wx[k], ctrl_state= cs + "1")
-        qc.ccx(self._wy[k+1], self._x[k], self._wx[k], ctrl_state= cs + "1")
+        if k == n - 1:
+            qc.cx(self._x[k], self._wx[k], ctrl_state=cs)
+        else:
+            qc.ccx(self._wy[k+1], self._x[k], self._wx[k], ctrl_state= cs + "1")
+        # qc.ccx(self._wy[k+1], self._x[k], self._wx[k], ctrl_state= cs + "1")
 
         # begin low half
 
@@ -201,7 +203,7 @@ class RadialFuncQrom(Frame):
 
         # end low half
         if self._has_data_x[k, xi*2, yi] and self._has_data_x[k, xi*2+1, yi]:
-            if k == n - 2:
+            if k == n - 1:
                 qc.x(self._wx[k])
             else:
                 qc.cx(self._wy[k+1], self._wx[k]) # middle
@@ -247,11 +249,11 @@ class RadialFuncQrom(Frame):
         else:
             cs = '0'
 
-        # if k == n - 2:
-        #     qc.cx(self._x[k], self._wx[k], ctrl_state=cs)
-        # else:
-        #     qc.ccx(self._wy[k+1], self._x[k], self._wx[k], ctrl_state=cs+"1")
-        qc.ccx(self._wy[k+1], self._x[k], self._wx[k], ctrl_state=cs+"1")
+        if k == n - 1:
+            qc.cx(self._x[k], self._wx[k], ctrl_state=cs)
+        else:
+            qc.ccx(self._wy[k+1], self._x[k], self._wx[k], ctrl_state=cs+"1")
+        # qc.ccx(self._wy[k+1], self._x[k], self._wx[k], ctrl_state=cs+"1")
     
     def bind(self, x:QuantumRegister, y:QuantumRegister):
         return Binding(self, {"x": x, "y": y})
@@ -274,7 +276,7 @@ class RadialFuncQromTestBoard(Frame):
     def build_circuit(self):
         qc = self.circuit
         qc.h(self._x)
-        # qc.h(self._y)
+        qc.h(self._y)
         self._rfq = RadialFuncQrom(self._n, self._dq, self._rfunc)
         self.invoke(self._rfq.bind(x=self._x, y=self._y))
 
