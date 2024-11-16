@@ -129,7 +129,7 @@ class RadialFuncQrom(Frame):
         yi = 0
         k = n - 1
 
-        self._build_area(xi, yi, k)
+        self._build_area(xi, yi, k, None, None)
 
         for i in range(n-1,-1,-1):
             qc.cswap(self._cz[0], self._x[i], self._y[i])
@@ -146,7 +146,7 @@ class RadialFuncQrom(Frame):
         absx_dag_gate.label = f"abs\u2020({n})"
         qc.append(absx_dag_gate, self._x[:] + self._sx[:] + self._cr[:])
 
-    def _build_area(self, xi, yi, k):
+    def _build_area(self, xi, yi, k, wxk:QuantumRegister, wyk:QuantumRegister):
 
         qc = self.circuit
         n = self._n
@@ -157,87 +157,83 @@ class RadialFuncQrom(Frame):
                 # focus on lower half.
                 if k == n - 1:
                     qc.cx(self._x[k], self._wx[k], ctrl_state="0")
+                    wxk = self._wx[k]
                 else:
-                    qc.ccx(self._wy[k+1], self._x[k], self._wx[k], ctrl_state="01")
+                    qc.ccx(wyk, self._x[k], self._wx[k], ctrl_state="01")
+                    wxk = self._wx[k]
                 # do the lower half
-                self._build_area_x_low(xi,yi,k)
+                self._build_area_x_low(xi,yi,k,wxk,wyk)
                 # middle.
                 # switch focus to upper half
                 if k == n - 1:
                     qc.x(self._wx[k])
                 else:
-                    qc.cx(self._wy[k+1], self._wx[k])
+                    qc.cx(wyk, self._wx[k])
                 # do the upper half
-                self._build_area_x_high(xi,yi,k)
+                self._build_area_x_high(xi,yi,k,wxk,wyk)
                 # reset focus
                 if k == n - 1:
                     qc.cx(self._x[k], self._wx[k], ctrl_state="1")
                 else:
-                    qc.ccx(self._wy[k+1], self._x[k], self._wx[k], ctrl_state="11")
+                    qc.ccx(wyk, self._x[k], self._wx[k], ctrl_state="11")
             else:
                 # only x low has data
                 # focus on lower half.
                 if k == n - 1:
                     qc.x(self._wx[k])
+                    wxk = self._wx[k]
                 else:
-                    qc.cx(self._wy[k+1], self._wx[k])
+                    wxk = wyk
                 # do the lower half
-                self._build_area_x_low(xi,yi,k)
+                self._build_area_x_low(xi,yi,k,wxk,wyk)
                 # reset focus
                 if k == n - 1:
                     qc.x(self._wx[k])
                 else:
-                    qc.cx(self._wy[k+1], self._wx[k])
+                    pass
         else:
             if self._has_data_x[k, xi*2+1, yi]:
                 # only x high has data.
                 # set focus.
                 if k == n - 1:
                     qc.x(self._wx[k])
+                    wxk = self._wx[k]
                 else:
-                    qc.cx(self._wy[k+1], self._wx[k])
-                # do the lower half
-                self._build_area_x_low(xi,yi,k)
-                # switch focus to upper half
-                if k == n - 1:
-                    qc.x(self._wx[k])
-                else:
-                    qc.cx(self._wy[k+1], self._wx[k]) # middle
+                    wxk = wyk
                 # do the upper half
-                self._build_area_x_high(xi,yi,k)
+                self._build_area_x_high(xi,yi,k,wxk,wyk)
                 # reset focus
                 if k == n - 1:
                     qc.x(self._wx[k])
                 else:
-                    qc.cx(self._wy[k+1], self._wx[k])
+                    pass
             else:
                 # x low and x high both have no data.
                 # does not come here.
                 print("Error: no data for x low half")
 
     
-    def _build_area_x_low(self, xi, yi, k):
+    def _build_area_x_low(self, xi, yi, k, wxk:QuantumRegister, wyk:QuantumRegister):
         qc = self.circuit
         if k > 0:
             if self._has_data_y[k, xi*2, yi*2]:
                 if self._has_data_y[k, xi*2, yi*2+1]:
                     # both y low and y high have data
-                    qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='01')
-                    self._build_area(xi*2, yi*2, k-1)
-                    qc.cx(self._wx[k], self._wy[k])
-                    self._build_area(xi*2, yi*2+1, k-1)
-                    qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='11')
+                    qc.ccx(wxk, self._y[k], self._wy[k], ctrl_state='01')
+                    wyk = self._wy[k]
+                    self._build_area(xi*2, yi*2, k-1, wxk, wyk)
+                    qc.cx(wxk, self._wy[k])
+                    self._build_area(xi*2, yi*2+1, k-1, wxk, wyk)
+                    qc.ccx(wxk, self._y[k], self._wy[k], ctrl_state='11')
                 else:
                     # only y low has data
-                    qc.cx(self._wx[k], self._wy[k])
-                    self._build_area(xi*2, yi*2, k-1)
-                    qc.cx(self._wx[k], self._wy[k])
+                    wyk = wxk
+                    self._build_area(xi*2, yi*2, k-1, wxk, wyk)
             else:
                 if self._has_data_y[k, xi*2, yi*2+1]:
                     # only y high has data
-                    qc.cx(self._wx[k], self._wy[k])
-                    self._build_area(xi*2, yi*2+1, k-1)
-                    qc.cx(self._wx[k], self._wy[k])
+                    wyk = wxk
+                    self._build_area(xi*2, yi*2+1, k-1, wxk, wyk)
                 else:
                     # y low and y high both have no data.
                     # does not come here.
@@ -246,7 +242,7 @@ class RadialFuncQrom(Frame):
             # later bit comes first
             v = self._data[xi*2, yi*2+1]
             if v != 0.0:
-                qc.cp(v, self._wx[0], self._y[0])
+                qc.cp(v, wxk, self._y[0])
 
             # earlier bit comes second
             v = self._data[xi*2, yi*2]
@@ -254,36 +250,35 @@ class RadialFuncQrom(Frame):
             if self._has_data_x[k, xi*2+1, yi]:
                 qc.x(self._y[0])
                 if v != 0.0:
-                    qc.cp(v, self._wx[0], self._y[0])
+                    qc.cp(v, wxk, self._y[0])
                     pass
             else:
                 if v != 0.0:
                     qc.x(self._y[0])
-                    qc.cp(v, self._wx[0], self._y[0])
+                    qc.cp(v, wxk, self._y[0])
                     qc.x(self._y[0])
 
-    def _build_area_x_high(self, xi, yi, k):
+    def _build_area_x_high(self, xi, yi, k, wxk:QuantumRegister, wyk:QuantumRegister):
         qc = self.circuit
         if k > 0:
             if self._has_data_y[k, xi*2+1, yi*2]:
                 if self._has_data_y[k, xi*2+1, yi*2+1]:
                     # both y low and y high have data
-                    qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='01')
-                    self._build_area(xi*2+1, yi*2, k-1)
-                    qc.cx(self._wx[k], self._wy[k])
-                    self._build_area(xi*2+1, yi*2+1, k-1)
-                    qc.ccx(self._wx[k], self._y[k], self._wy[k], ctrl_state='11')
+                    qc.ccx(wxk, self._y[k], self._wy[k], ctrl_state='01')
+                    wyk = self._wy[k]
+                    self._build_area(xi*2+1, yi*2, k-1, wxk, wyk)
+                    qc.cx(wxk, self._wy[k])
+                    self._build_area(xi*2+1, yi*2+1, k-1, wxk, wyk)
+                    qc.ccx(wxk, self._y[k], self._wy[k], ctrl_state='11')
                 else:
                     # only y low has data
-                    qc.cx(self._wx[k], self._wy[k])
-                    self._build_area(xi*2+1, yi*2, k-1)
-                    qc.cx(self._wx[k], self._wy[k])
+                    wyk = wxk
+                    self._build_area(xi*2+1, yi*2, k-1, wxk, wyk)
             else:
                 if self._has_data_y[k, xi*2+1, yi*2+1]:
                     # only y high has data
-                    qc.cx(self._wx[k], self._wy[k])
+                    wyk = wxk
                     self._build_area(xi*2+1, yi*2+1, k-1)
-                    qc.cx(self._wx[k], self._wy[k])
                 else:
                     # y low and y high both have no data.
                     # does not come here.
@@ -293,13 +288,13 @@ class RadialFuncQrom(Frame):
             # cancels with low half
             if self._has_data_x[k, xi*2, yi]:
                 if v != 0.0:
-                    qc.cp(v, self._wx[0], self._y[0])
+                    qc.cp(v, wxk, self._y[0])
                     pass
                 qc.x(self._y[0])
             else:
                 if v != 0.0:
                     qc.x(self._y[0])
-                    qc.cp(v, self._wx[0], self._y[0])
+                    qc.cp(v, wxk, self._y[0])
                     qc.x(self._y[0])
 
             v = self._data[xi*2+1, yi*2+1]
