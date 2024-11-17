@@ -45,6 +45,7 @@ class RfqPotentialSpec:
         elec_elec_potential_func,
         elec_nucl_potential_func,
     ):
+        assert isinstance(wfr_spec, wave_function.WaveFunctionRegisterSpec)
         self._wfr_spec = wfr_spec
         self._elec_elec_potential_func = elec_elec_potential_func
         self._elec_nucl_potential_func = elec_nucl_potential_func

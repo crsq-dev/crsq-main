@@ -25,11 +25,12 @@ class RadialFuncQrom(Frame):
         n: bits per dimension
         rfunc: function of the form rfunc(r: float) -> float
     """
-    def __init__(self, n: int, dq: float, rfunc: callable, build = True):
+    def __init__(self, n: int, dq: float, rfunc: callable, build = True, verbose=False):
         super().__init__(label="RadialFuncQROM")
         logger.info("start: RadialFuncQrom()")
         t1 = time.time()
         self._n = n
+        self._verbose = verbose
         self._dq = dq  # grid spacing
         self._rfunc = rfunc
         self._prepare_data()
@@ -75,6 +76,13 @@ class RadialFuncQrom(Frame):
             for i in range(0, w):
                 self._has_data_x[k, i, j] = self._has_data_y[k, i, 2*j] or self._has_data_y[k, i, 2*j+1]
         w = M
+        if self._verbose:
+            self._print_tables()
+
+    def _print_tables(self):
+        n = self._n
+        M = 2**n
+        w = M
         for k in range(n):
             print(f"has_data_y[{k}]")
             for j in range(w):
@@ -83,7 +91,8 @@ class RadialFuncQrom(Frame):
             for j in range(w//2):
                 print(self._has_data_x[k, :w, j])
             w = w//2
-    
+
+
     def allocate_registers(self):
         """ allocate """
         n = self._n
@@ -313,11 +322,12 @@ class RadialFuncQrom(Frame):
 
 
 class RadialFuncQromTestBoard(Frame):
-    def __init__(self, n: int, dq: float, rfunc: callable):
+    def __init__(self, n: int, dq: float, rfunc: callable, verbose=True):
         super().__init__(label="RFQTest")
         self._n = n
         self._dq = dq
         self._rfunc = rfunc
+        self._verbose = verbose
         self.allocate_registers()
         self.build_circuit()
     
@@ -330,7 +340,7 @@ class RadialFuncQromTestBoard(Frame):
         qc = self.circuit
         qc.h(self._x)
         qc.h(self._y)
-        self._rfq = RadialFuncQrom(self._n, self._dq, self._rfunc)
+        self._rfq = RadialFuncQrom(self._n, self._dq, self._rfunc, verbose=self._verbose)
         self.invoke(self._rfq.bind(x=self._x, y=self._y))
 
     @property
