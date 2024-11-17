@@ -18,6 +18,7 @@ class AntisymmetrizationSpec:
         :param method: 1 : conventional, 2: unary encoding, 3: binary
     """
     def __init__(self, wfr_spec: wave_function.WaveFunctionRegisterSpec, method: int):
+        assert isinstance(wfr_spec, wave_function.WaveFunctionRegisterSpec)
         self._wfr_spec = wfr_spec
         self.method = method
         self._should_do_anti_symmetrization = True

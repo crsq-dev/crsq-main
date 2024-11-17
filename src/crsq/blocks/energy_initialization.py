@@ -14,7 +14,17 @@ logger = logging.getLogger(__name__)
 LOG_TIME_THRESH = 1
 
 class EnergyConfigurationSpec:
-    """ Energy initialization spec"""
+    """ Energy initialization spec
+    Args:
+        energy_configuration_weights: List of probabilities for each of the energy configurations
+          e.g. [0.5, 0.5] for two configurations
+        initial_electron_orbitals: array of orbital wave function values of
+        shape [energy_conf, electron, dimension, position]
+          e.g. orbitals[energy_conf][electron_idx][dimension_idx][position_idx]
+        initial_nucleus_orbitals: array of orbital wave function values of
+        shape [energy_conf, nucleus, dimension, position]
+            e.g. orbitals[energy_conf][nucleus_idx][dimension_idx][position_idx]
+        """
     def __init__(self,
                  energy_configuration_weights: List[float],
                  initial_electron_orbitals: List[List[List[List[float]]]],

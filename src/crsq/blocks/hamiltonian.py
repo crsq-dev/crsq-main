@@ -39,6 +39,7 @@ class HamiltonianSpec:
     def __init__(self,
                  wfr_spec: wave_function.WaveFunctionRegisterSpec,
                  nuclei_data: list[dict]):
+        assert isinstance(wfr_spec, wave_function.WaveFunctionRegisterSpec)
         self._wfr_spec = wfr_spec
         # bit size for constant in V(x)
         self._should_apply_potential_to_phase = True
