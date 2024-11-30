@@ -15,20 +15,20 @@ class TimeEvolutionSpec:
     """
     def __init__(self,
                  ham_spec: hamiltonian.HamiltonianSpec,
-                 rfq_spec: rfqhamiltonian.RfqPotentialSpec,
                  disc_spec: discretization.DiscretizationSpec,
                  num_atom_iterations: int,
                  num_elec_per_atom_iterations: int,
-                 save_state_vector_per_atom_iteration: bool = False,
-                 method=SUZUKI_TROTTER_ARITHMETIC):
+                 method: str = SUZUKI_TROTTER_ARITHMETIC,
+                 rfq_spec: rfqhamiltonian.RfqPotentialSpec = None,
+                 save_state_vector_per_atom_iteration: bool = False
+                 ):
         assert isinstance(ham_spec, hamiltonian.HamiltonianSpec)
-        assert isinstance(rfq_spec, rfqhamiltonian.RfqPotentialSpec)
         assert isinstance(disc_spec, discretization.DiscretizationSpec)
         assert isinstance(num_atom_iterations, int)
         assert isinstance(num_elec_per_atom_iterations, int)
+        assert rfq_spec is None or isinstance(rfq_spec, rfqhamiltonian.RfqPotentialSpec)
         
         self._ham_spec = ham_spec
-        self._rfq_spec = rfq_spec
         self._disc_spec = disc_spec
         self._num_atom_iterations = num_atom_iterations
         self._num_elec_per_atom_iterations = num_elec_per_atom_iterations
@@ -41,7 +41,10 @@ class TimeEvolutionSpec:
         valid_methods = [SUZUKI_TROTTER_ARITHMETIC, SUZUKI_TROTTER_QROM]
         if method not in valid_methods:
             raise ValueError(f"method must be one of {valid_methods}")
+        if method == SUZUKI_TROTTER_QROM and rfq_spec is None:
+            raise ValueError("rfq_spec is required when method is SUZUKI_TROTTER_QROM")
         self._method = method
+        self._rfq_spec = rfq_spec
 
     @property
     def ham_spec(self) -> hamiltonian.HamiltonianSpec:

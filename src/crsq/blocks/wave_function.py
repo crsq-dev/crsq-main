@@ -3,6 +3,7 @@
 from typing import List
 import math
 import logging
+import numpy as np
 from qiskit import QuantumRegister
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ class WaveFunctionRegisterSpec:
             int(math.ceil(math.log2(num_electrons))))
         M = 2**num_coordinate_bits
         self._delta_q = space_length/M
-        self._delta_k = 2*math.pi/self.space_length
+        self._delta_k = 2*math.pi/M
         logger.info("WaveFunctionRegisterSpec: dimension = %d", dimension)
         logger.info("WaveFunctionRegisterSpec: num_coordinate_bits = %d", num_coordinate_bits)
         logger.info("WaveFunctionRegisterSpec: space_length = %f", space_length)
@@ -141,7 +142,7 @@ def make_null_elec_orbitals(num_ene_conf: int) -> List[List[List[List[float]]]]:
     """
     configs = []
     for _conf in range(num_ene_conf):
-        electrons:List[List[List[float]]] = []
+        electrons:List[np.ndarray] = []
         configs.append(electrons)
     return configs
 
@@ -157,20 +158,28 @@ def make_test_elec_orbitals(wfr_spec: WaveFunctionRegisterSpec,
     for _conf in range(num_ene_conf):
         electrons = []
         for elec in range(num_electrons):
-            dims = []
-            # spin is 100% |0>
-            for d in range(dim):
-                positions = []
+            if dim == 1:
+                array = np.zeros(num_positions, dtype=complex)
                 for x in range(num_positions):
                     k = 2*math.pi/num_positions*(2**elec)
-                    t0 = math.pi*d/2
-                    phi = 0.5 + 0.5*math.cos(t0+k*x)
-                    positions.append(phi)
-                dims.append(positions)
-            if wfr_spec.use_spin:
-                spins = [1.0, 0.0]
-                dims.append(spins)
-            electrons.append(dims)
+                    phi = 0.5 + 0.5*math.cos(k*x)
+                    array[x] = phi
+            elif dim == 2:
+                array = np.zeros((num_positions, num_positions), dtype=complex)
+                for x in range(num_positions):
+                    for y in range(num_positions):
+                        k = 2*math.pi/num_positions*(2**elec)
+                        phi = 0.5 + 0.5*math.cos(k*x)*math.cos(k*y)
+                        array[x, y] = phi
+            elif dim == 3:
+                array = np.zeros((num_positions, num_positions, num_positions), dtype=complex)
+                for x in range(num_positions):
+                    for y in range(num_positions):
+                        for z in range(num_positions):
+                            k = 2*math.pi/num_positions*elec
+                            phi = 0.5 + 0.5*math.cos(k*x)*math.cos(k*y)*math.cos(k*z)
+                            array[x, y, z] = phi
+            electrons.append(array)
         configs.append(electrons)
     return configs
 
@@ -181,8 +190,8 @@ def make_null_nucl_orbitals(num_ene_conf: int) -> List[List[List[List[float]]]]:
     """
     configs = []
     for _conf in range(num_ene_conf):
-        electrons:List[List[List[float]]] = []
-        configs.append(electrons)
+        nuclei:List[np.ndarray] = []
+        configs.append(nuclei)
     return configs
 
 def make_test_nucl_orbitals(wfr_spec: WaveFunctionRegisterSpec,
@@ -197,15 +206,27 @@ def make_test_nucl_orbitals(wfr_spec: WaveFunctionRegisterSpec,
     for _conf in range(num_ene_conf):
         nuclei = []
         for nucl in range(num_nuclei):
-            dims = []
-            for d in range(dim):
-                positions = []
+            if dim == 1:
+                array = np.zeros(num_positions, dtype=complex)
                 for x in range(num_positions):
                     k = 2*math.pi/num_positions*(2**nucl)
-                    t0 = math.pi*d/2
-                    phi = 0.5 + 0.5*math.cos(t0+k*x)
-                    positions.append(phi)
-                dims.append(positions)
-            nuclei.append(dims)
+                    phi = 0.5 + 0.5*math.cos(k*x)
+                    array[x] = phi
+            elif dim == 2:
+                array = np.zeros((num_positions, num_positions), dtype=complex)
+                for x in range(num_positions):
+                    for y in range(num_positions):
+                        k = 2*math.pi/num_positions*(2**nucl)
+                        phi = 0.5 + 0.5*math.cos(k*x)*math.cos(k*y)
+                        array[x, y] = phi
+            elif dim == 3:
+                array = np.zeros((num_positions, num_positions, num_positions), dtype=complex)
+                for x in range(num_positions):
+                    for y in range(num_positions):
+                        for z in range(num_positions):
+                            k = 2*math.pi/num_positions*(2**nucl)
+                            phi = 0.5 + 0.5*math.cos(k*x)*math.cos(k*y)*math.cos(k*z)
+                            array[x, y, z] = phi
+            nuclei.append(array)
         configs.append(nuclei)
     return configs

@@ -6,6 +6,8 @@ import math
 import logging
 import time
 
+import numpy as np
+
 from qiskit import QuantumRegister
 from crsq_heap.heap import Frame, Binding
 from crsq.blocks import antisymmetrization, embed, embed2
@@ -19,16 +21,16 @@ class EnergyConfigurationSpec:
         energy_configuration_weights: List of probabilities for each of the energy configurations
           e.g. [0.5, 0.5] for two configurations
         initial_electron_orbitals: array of orbital wave function values of
-        shape [energy_conf, electron, dimension, position]
-          e.g. orbitals[energy_conf][electron_idx][dimension_idx][position_idx]
+        shape [energy_conf, electron, xpos, {ypos, zpos} ]
+          e.g. orbitals[energy_conf][electron_idx][xidx][yidx][zidx]
         initial_nucleus_orbitals: array of orbital wave function values of
-        shape [energy_conf, nucleus, dimension, position]
-            e.g. orbitals[energy_conf][nucleus_idx][dimension_idx][position_idx]
+        shape [energy_conf, nucleus, xpos, {ypos, zpos}]
+            e.g. orbitals[energy_conf][nucleus_idx][xidx][yidx][zidx]
         """
     def __init__(self,
                  energy_configuration_weights: List[float],
-                 initial_electron_orbitals: List[List[List[List[float]]]],
-                 initial_nucleus_orbitals: List[List[List[List[float]]]],
+                 initial_electron_orbitals: List[List[np.ndarray]],
+                 initial_nucleus_orbitals: List[List[np.ndarray]],
                  ):
         self._energy_configuration_weights = energy_configuration_weights
         self._initial_electron_orbitals = initial_electron_orbitals
@@ -87,7 +89,7 @@ class GeneralStatePreparationBlock(Frame):
         :param energy_configuration_weights: List of probabilities for each of
             the energy configurations
         :param initial_electron_orbitals: array of shape [energy_conf, electron,
-            dimension, position]
+            posx, {posy, posz}]
         
         :param antisym_method: 1: conventional, 2: unary coded,
             ancilla-shuffle-less
@@ -268,8 +270,8 @@ class SlaterDeterminantPreparationBlock(Frame):
         self._asy_spec = asy_spec
         self._wfr_spec = asy_spec.wfr_spec
         self._energy_state_index = energy_state_index
-        self._e_index_regs: List[List[List[QuantumRegister]]] = []
-        self._n_index_regs: List[List[List[QuantumRegister]]] = []
+        self._eregs: List[List[List[QuantumRegister]]] = []
+        self._nregs: List[List[List[QuantumRegister]]] = []
         self._sigma_regs: List[QuantumRegister]
         self._shuffle_ancilla: QuantumRegister
         self.allocate_registers()
@@ -299,8 +301,8 @@ class SlaterDeterminantPreparationBlock(Frame):
         wfr_spec = self._wfr_spec
         eregs = wfr_spec.allocate_elec_registers()
         nregs = wfr_spec.allocate_nucl_registers()
-        self._e_index_regs = eregs
-        self._n_index_regs = nregs
+        self._eregs = eregs
+        self._nregs = nregs
         self.add_param(('eregs', eregs),('nregs', nregs))
         asy_spec = self._asy_spec
         self._sigma_regs = asy_spec.allocate_sigma_regs()
@@ -319,32 +321,41 @@ class SlaterDeterminantPreparationBlock(Frame):
             self._build_antisymmetrization()
 
     def _set_orbital_data(self):
+        wfr_spec = self._wfr_spec
+        nbits = wfr_spec.num_coordinate_bits
+        dim = wfr_spec.dimension
         ene_spec = self._ene_spec
         electrons = ene_spec.initial_electron_orbitals[self._energy_state_index]
         for i in range(self._num_electrons):
             e = electrons[i]
-            for d, _t in enumerate(e):
-                array = e[d]
-                reg = self._e_index_regs[i][d]
-                if self._ene_spec.should_use_embed2:
-                    emb = embed2.StateEmbedGate2(array)
-                else:
-                    emb = embed.StateEmbedGate(array)
-                self.invoke(emb.bind(q=reg))
-                # setdist.setdist(qc, reg, array)
+            array = e.flatten() # 1D/2D/3D array to 1D array
+            if dim == 1:
+                reg = self._eregs[i][0]
+            elif dim == 2:
+                reg = QuantumRegister(name="exy", bits=self._eregs[i][1][:] + self._eregs[i][0][:])
+            elif dim == 3:
+                reg = QuantumRegister(name="exyz", bits=self._eregs[i][2][:] + self._eregs[i][1][:] + self._eregs[i][0][:])
+            if self._ene_spec.should_use_embed2:
+                emb = embed2.StateEmbedGate2(array)
+            else:
+                emb = embed.StateEmbedGate(array)
+            self.invoke(emb.bind(q=reg))
 
         nuclei = ene_spec.initial_nucleus_orbitals[self._energy_state_index]
         for a in range(self._num_nuclei):
             n = nuclei[a]
-            for d, _t in enumerate(n):
-                array = n[d]
-                reg = self._n_index_regs[a][d]
-                if self._ene_spec.should_use_embed2:
-                    emb = embed2.StateEmbedGate2(array)
-                else:
-                    emb = embed.StateEmbedGate(array)
-                self.invoke(emb.bind(q=reg))
-                # setdist.setdist(qc, reg, array)
+            array = n.flatten()
+            if dim == 1:
+                reg = self._nregs[a][0]
+            elif dim == 2:
+                reg = QuantumRegister(name="nxy", bits=self._nregs[a][1][:] + self._nregs[a][0][:])
+            elif dim == 3:
+                reg = QuantumRegister(name="nxyz", bits=self._nregs[a][2][:] + self._nregs[a][1][:] + self._nregs[a][0][:])
+            if self._ene_spec.should_use_embed2:
+                emb = embed2.StateEmbedGate2(array)
+            else:
+                emb = embed.StateEmbedGate(array)
+            self.invoke(emb.bind(q=reg))
 
     def _build_antisymmetrization(self):
         """ build the antisymmetrization block """
@@ -356,13 +367,13 @@ class SlaterDeterminantPreparationBlock(Frame):
         if method == 1:
             block = antisymmetrization.ABRegisterPermutationBlock(wfr_spec)
             self.invoke(block.bind(sigmas=self._sigma_regs,
-                                   ancilla=self._shuffle_ancilla, eregs=self._e_index_regs))
+                                   ancilla=self._shuffle_ancilla, eregs=self._eregs))
         elif method == 2:
             block = antisymmetrization.UnaryCodedPermutationBlock(asy_spec)
-            self.invoke(block.bind(eregs=self._e_index_regs, aregs=self._sigma_regs))
+            self.invoke(block.bind(eregs=self._eregs, aregs=self._sigma_regs))
         elif method == 3:
             block = antisymmetrization.BinaryCodedPermutationBlock(asy_spec)
-            self.invoke(block.bind(eregs=self._e_index_regs,
+            self.invoke(block.bind(eregs=self._eregs,
                                    swap=self._shuffle_ancilla, aregs=self._sigma_regs))
         else:
             raise ValueError(f"Unknown method number {method}")

@@ -119,17 +119,16 @@ class Simulator(heap.Frame):
             self._build_time_evolution_with_suzuki_trotter()
     
     def _build_time_evolution_with_suzuki_trotter(self):
-        if self._use_motion_block_gates:
-            st_block = time_evolution.SuzukiTrotterMethodBlock(self._evo_spec, self._ene_spec, self._asy_spec)
-            with check_time("SuzukiTrotterIntegrator.invoke"):
-                self.invoke(
-                    st_block.bind(
-                        eregs=self._e_index_regs,
-                        nregs=self._n_index_regs
-                    ),
-                    invoke_as_instruction=True
-                )
-            return
-        st_block = time_evolution.SuzukiTrotterMethodBlock(self._evo_spec, self._ene_spec, self._asy_spec, use_motion_block_gates=False)
-        st_block.build_circuit_on(self)
+        st_block = time_evolution.SuzukiTrotterMethodBlock(self._evo_spec, self._ene_spec, self._asy_spec)
+        with check_time("SuzukiTrotterIntegrator.invoke"):
+            self.invoke(
+                st_block.bind(
+                    eregs=self._e_index_regs,
+                    nregs=self._n_index_regs,
+                    slater_indices=self._slater_indices,
+                    slater_ancilla=self._slater_ancilla,
+                    p=self._energy_configuration_reg,
+                ),
+                invoke_as_instruction=True
+            )
         
