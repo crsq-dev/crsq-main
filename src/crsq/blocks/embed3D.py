@@ -1,4 +1,4 @@
-""" State preparation gate for 2D data on a pair of quantum registers
+""" State preparation gate for 3D data on a trio of quantum registers
 """
 
 import cupy as np
@@ -13,14 +13,17 @@ logger = logging.getLogger(__name__)
 LOG_TIME_THRESH=1
 
 class StateEmbedGate2D(Frame):
-    """ State embedding gate for 2D data in the form data[r,c]
-        r is row index, c is column index
+    """ State embedding gate for 2D data in the form data[p,r,c]
+        p is plane index, r is row index, c is column index
     """
     def __init__(self, data: np.ndarray, build = True):
         super().__init__()
-        logger.info("start: StateEmbedGate2D()")
+        logger.info("start: StateEmbedGate3D()")
         t1 = time.time()
-        nr, nc = data.shape
+        np, nr, nc = data.shape
+        num_pbits = math.ceil(math.log2(np))
+        if 2**num_pbits != np:
+            raise ValueError("plane count must be a power of 2")
         num_rbits = math.ceil(math.log2(nr))
         if 2**num_rbits != nr:
             raise ValueError("row count must be a power of 2")
@@ -28,10 +31,12 @@ class StateEmbedGate2D(Frame):
         if 2**num_cbits != nc:
             raise ValueError("column count must be a power of 2")
         self._num_rbits = num_rbits
+        self._num_pbits = num_pbits
         self._num_cbits = num_cbits
-        self._num_bits = num_rbits + num_cbits
-        self._label = f"emb2d({num_rbits},{num_cbits})"
+        self._num_bits = num_pbits + num_rbits + num_cbits
+        self._label = f"emb3d({num_pbits},{num_rbits},{num_cbits})"
         self._data = data.flatten()
+        self._preg: QuantumRegister = None
         self._rreg: QuantumRegister = None
         self._creg: QuantumRegister = None
         self._qreg: QuantumRegister = None
@@ -42,14 +47,15 @@ class StateEmbedGate2D(Frame):
         t2 = time.time()
         dt = t2 - t1
         if dt > LOG_TIME_THRESH:
-            logger.info("end  : StateEmbedGate2D() %f msec", round(dt*1000))
+            logger.info("end  : StateEmbedGate3D() %f msec", round(dt*1000))
 
     def allocate_registers(self):
         """ allocate """
+        self._preg = QuantumRegister(self._num_rbits, "plane")
         self._rreg = QuantumRegister(self._num_rbits, "row")
         self._creg = QuantumRegister(self._num_rbits, "col")
-        self._qreg = QuantumRegister(name="q", bits = self._creg[:] + self._rreg[:])
-        self.add_param(self._rreg, self._creg)
+        self._qreg = QuantumRegister(name="q", bits = self._creg[:] + self._rreg[:] + self._preg[:])
+        self.add_param(self._preg, self._rreg, self._creg)
         self._work = QuantumRegister(self._num_bits-1, "w")
         self.add_local(self._work)
 
@@ -144,7 +150,7 @@ class StateEmbedGate2D(Frame):
             self.build_structure_for_bit(bit-1, norms[1][1], phases[1][1])
             qc.ccx(self._work[bit], self._qreg[bit], self._work[bit-1])
         
-    def bind(self, row: QuantumRegister, col: QuantumRegister)-> Binding:
+    def bind(self, plane: QuantumRegister, row: QuantumRegister, col: QuantumRegister)-> Binding:
         """ bind """
-        return Binding(self, {"row": row, "col": col})
+        return Binding(self, {"plane": plane, "row": row, "col": col})
 
