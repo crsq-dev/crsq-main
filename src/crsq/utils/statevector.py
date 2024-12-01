@@ -105,8 +105,8 @@ def extract_dist2_sub(sv: Statevector, xfrom: int, xto: int,
         x_index = (k & x_bitmask) >> xfrom
         y_index = (k & y_bitmask) >> yfrom
         dists[x_index, y_index] = dists[x_index, y_index] + z
-        if abs(z) > 0.001:
-            print(f"dists[{x_index}][{y_index}]+={z} => {dists[x_index,y_index]}")
+        # if abs(z) > 0.001:
+        #     print(f"dists[{x_index}][{y_index}]+={z} => {dists[x_index,y_index]}")
     return dists
 
 def extract_dist2d_from_file_sub(path: str, xfrom: int, xto: int, yfrom: int, yto: int) -> Statevector:
@@ -151,7 +151,7 @@ def extract_dist(qc: QuantumCircuit, sv: Statevector, data_reg: str, eps=1.0e-12
     return extract_dist_sub(sv, dreg[0], dreg[1], eps)
 
 def extract_dist2d(qc: QuantumCircuit, sv: Statevector, xreg: str, yreg: str, eps=1.0e-12) -> np.ndarray:
-    """ make a 2-d array indexed by group_reg, data_reg
+    """ make a 2-d array indexed by xreg, yreg
     """
     reg_map = {}
     acc = 0

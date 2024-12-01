@@ -1,9 +1,8 @@
-""" state preparation gates (unary iteration using ancilla qubits)
+""" State preparation gate for 2D data on a pair of quantum registers
 """
 
-from typing import List
-import math
-import cmath
+import cupy as np
+import math, cmath
 import time
 import logging
 
@@ -13,21 +12,30 @@ from crsq_heap.heap import Frame, Binding
 logger = logging.getLogger(__name__)
 LOG_TIME_THRESH=1
 
-class StateEmbedGate2(Frame):
-    """ State embedding gate
+class StateEmbedGate2D(Frame):
+    """ State embedding gate for 2D data in the form data[r,c]
+        r is row index, c is column index
     """
-    def __init__(self, data: List[float] | List[complex], build=True):
+    def __init__(self, data: np.ndarray, build = True):
         super().__init__()
         logger.info("start: StateEmbedGate()")
         t1 = time.time()
-        num_bits = math.ceil(math.log2(len(data)))
-        if 2**num_bits != len(data):
-            raise ValueError("data length must be a power of 2")
-        self._num_bits = num_bits
-        self._label = f"emb({num_bits})"
-        self._data = data
-        self._qreg: QuantumRegister
-        self._work: QuantumRegister
+        nr, nc = data.shape
+        num_rbits = math.ceil(math.log2(nr))
+        if 2**num_rbits != nr:
+            raise ValueError("row count must be a power of 2")
+        num_cbits = math.ceil(math.log2(nc))
+        if 2**num_cbits != nc:
+            raise ValueError("column count must be a power of 2")
+        self._num_rbits = num_rbits
+        self._num_cbits = num_cbits
+        self._num_bits = num_rbits + num_cbits
+        self._label = f"emb2d({num_rbits},{num_cbits})"
+        self._data = data.flatten()
+        self._rreg: QuantumRegister = None
+        self._creg: QuantumRegister = None
+        self._qreg: QuantumRegister = None
+        self._work: QuantumRegister = None
         self.allocate_registers()
         if build:
             self.build_circuit()
@@ -38,8 +46,10 @@ class StateEmbedGate2(Frame):
 
     def allocate_registers(self):
         """ allocate """
-        self._qreg = QuantumRegister(self._num_bits, "q")
-        self.add_param(self._qreg)
+        self._rreg = QuantumRegister(self._num_rbits, "row")
+        self._creg = QuantumRegister(self._num_rbits, "col")
+        self._qreg = QuantumRegister(name="q", bits = self._creg[:] + self._rreg[:])
+        self.add_param(self._rreg, self._creg)
         self._work = QuantumRegister(self._num_bits-1, "w")
         self.add_local(self._work)
 
@@ -48,6 +58,11 @@ class StateEmbedGate2(Frame):
         norms = self.build_norm_tree()
         phases = self.build_phase_tree()
         n = self._num_bits
+
+        # the top bit is treated differently from the rest,
+        # so we cannot use the build_structure_for_bit method here.
+        bit = n - 1
+
         qc = self.circuit
 
         s0 = norms[0][0]
@@ -58,7 +73,12 @@ class StateEmbedGate2(Frame):
         avg1 = phases[1][0]
         phi = avg1 - avg0
 
-        bit = n - 1
+        global_phase = (avg0 + avg1)/2
+        if global_phase != 0.0:
+            qc.x(self._qreg[0])
+            qc.p(global_phase, self._qreg[0])
+            qc.x(self._qreg[0])
+
         if theta == math.pi:
             qc.x(self._qreg[bit])
         elif theta == math.pi/2:
@@ -97,7 +117,7 @@ class StateEmbedGate2(Frame):
                 avg1.append((avg, (avg0[2*j], avg0[2*j+1])))
             avg0 = avg1
         return avg0
-
+    
     def build_structure_for_bit(self, bit: int, norms, phases):
         qc = self.circuit
 
@@ -123,7 +143,8 @@ class StateEmbedGate2(Frame):
             qc.cx(self._work[bit], self._work[bit-1])
             self.build_structure_for_bit(bit-1, norms[1][1], phases[1][1])
             qc.ccx(self._work[bit], self._qreg[bit], self._work[bit-1])
-
-    def bind(self, q: QuantumRegister)-> Binding:
+        
+    def bind(self, row: QuantumRegister, col: QuantumRegister)-> Binding:
         """ bind """
-        return Binding(self, {"q": q})
+        return Binding(self, {"row": row, "col": col})
+
