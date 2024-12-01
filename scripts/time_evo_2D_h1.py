@@ -199,12 +199,13 @@ class Parameters:
         norm = np.linalg.norm(data)
         logger.info("norm(t=%d)=%f", time, norm)
         y = wrap(data)
-        ab = np.abs(y) / math.sqrt(self.dq)
-        re = np.real(y) / math.sqrt(self.dq)
-        im = np.imag(y) / math.sqrt(self.dq)
-        axs[0].plot(x, ab, label=f"t={time}")
-        axs[1].plot(x, re, label=f"t={time}")
-        axs[2].plot(x, im, label=f"t={time}")
+        np_x = np.asnumpy(x)
+        np_ab = np.asnumpy(np.abs(y) / math.sqrt(self.dq))
+        np_re = np.asnumpy(np.real(y) / math.sqrt(self.dq))
+        np_im = np.asnumpy(np.imag(y) / math.sqrt(self.dq))
+        axs[0].plot(np_x, np_ab, label=f"t={time}")
+        axs[1].plot(np_x, np_re, label=f"t={time}")
+        axs[2].plot(np_x, np_im, label=f"t={time}")
 
 
 def run_experiment(par: Parameters, tag: str):
