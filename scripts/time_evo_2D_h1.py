@@ -1,6 +1,7 @@
 import math, os, argparse
 # import numpy as np
 import cupy as np
+from matplotlib.axes import Axes
 import scipy.special as sp
 from matplotlib import pyplot as plt
 
@@ -42,7 +43,7 @@ class Parameters:
         precision="single",
         n1=5,
         num_nucl_iters=1,
-        num_elec_iters=1,
+        num_elec_iters=2,
         use_saved_data=False,
     ):
         self.outdir = outdir
@@ -80,11 +81,14 @@ class Parameters:
     def draw_circuits(self):
 
         M = self.M
-        self.xv = np.zeros((M,M))
-        self.yv = np.zeros((M,M))
-        for i in range(M):
-            self.yv[:,i] = np.linspace(-0, self.L-self.dq, M)
-            self.xv[i,:] = np.linspace(-0, self.L-self.dq, M)
+        xvals = np.linspace(-self.L/2, self.L/2-self.dq, M)
+        yvals = np.linspace(-self.L/2, self.L/2-self.dq, M)
+        signed_xvals = np.append(xvals[M//2:], xvals[0:M//2])
+        signed_yvals = np.append(yvals[M//2:], yvals[0:M//2])
+        sxv, syv = np.meshgrid(signed_xvals, signed_yvals)
+        self.xv = sxv
+        self.yv = syv
+
         self.x0 = 0
         self.y0 = 0
         # quantum numbers
@@ -170,42 +174,38 @@ class Parameters:
 
     def draw_graph(self):
         """draw the graph based on the results file."""
-        fig, axs = plt.subplots(3, 1, figsize=(6, 12))
-        axs[0].set_title("abs")
-        axs[1].set_title("real")
-        axs[2].set_title("imag")
-        x = np.linspace(0, self.L, self.M + 1)
-
-        def wrap(x):
-            return np.append(x, x[:1])
 
         dt = self.disc_spec.delta_t
         t = 0
         for _nucl_it in range(self.num_nucl_iters):
+            fig, axs = plt.subplots(1, 3, figsize=(15, 5), subplot_kw={"projection": "3d"})
+            axs[0].set_title("abs")
+            axs[1].set_title("real")
+            axs[2].set_title("imag")
             t += dt * self.evo_spec.num_elec_per_atom_iterations
-            self._add_plot(axs, t, x, wrap)
+            self._add_plot(axs, t, self.xv, self.yv)
+            axs[0].legend()
+            axs[1].legend()
+            axs[2].legend()
+            fig.savefig(self.outdir + f"/e0_{self.n1}b.{self.num_nucl_iters}n.{self.num_elec_iters}e.t{t}.png")
 
-        axs[0].legend()
-        axs[1].legend()
-        axs[2].legend()
-        fig.savefig(self.outdir + f"/ex0_{self.n1}b.{self.num_nucl_iters}n.{self.num_elec_iters}e.dist.png")
-
-    def _add_plot(self, axs, time, x, wrap):
+    def _add_plot(self, axs: list[Axes], time, xg, yg):
         fname = self.outdir + "/" + self.evo_spec.make_state_vector_file_name(time)
         logger.info("Reading: %s", fname)
         qc = self.stm_block.circuit
         sv = svec.read_from_file(fname)
-        data = svec.extract_dist(qc, sv, "e0x", eps=1e-12)
-        norm = np.linalg.norm(data)
+        np_data2d = svec.extract_dist2d(qc, sv, "e0y", "e0x")
+        data2d = np.array(np_data2d)
+        norm = np.linalg.norm(data2d)
         logger.info("norm(t=%d)=%f", time, norm)
-        y = wrap(data)
-        np_x = np.asnumpy(x)
-        np_ab = np.asnumpy(np.abs(y) / math.sqrt(self.dq))
-        np_re = np.asnumpy(np.real(y) / math.sqrt(self.dq))
-        np_im = np.asnumpy(np.imag(y) / math.sqrt(self.dq))
-        axs[0].plot(np_x, np_ab, label=f"t={time}")
-        axs[1].plot(np_x, np_re, label=f"t={time}")
-        axs[2].plot(np_x, np_im, label=f"t={time}")
+        np_xg = np.asnumpy(xg)
+        np_yg = np.asnumpy(yg)
+        np_ab = np.asnumpy(np.abs(data2d) / self.dq)
+        np_re = np.asnumpy(np.real(data2d) / self.dq)
+        np_im = np.asnumpy(np.imag(data2d) / self.dq)
+        axs[0].plot_surface(np_xg, np_yg, np_ab, label=f"t={time}")
+        axs[1].plot_surface(np_xg, np_yg, np_re, label=f"t={time}")
+        axs[2].plot_surface(np_xg, np_yg, np_im, label=f"t={time}")
 
 
 def run_experiment(par: Parameters, tag: str):
