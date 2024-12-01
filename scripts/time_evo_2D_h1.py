@@ -90,7 +90,8 @@ class Parameters:
         # quantum numbers
         qn = 0
         qm = 0
-        psifunc2d = PsiH2D(self.x0, self.y0, 0, qn, qm)
+        delta_q = self.dq / 2
+        psifunc2d = PsiH2D(self.x0, self.y0, delta_q, qn, qm)
         psixy = psifunc2d(self.xv, self.yv)
         ini_electrons = [psixy]
         ini_configs = [ini_electrons]
@@ -111,7 +112,7 @@ class Parameters:
             self.num_elec_iters,
             method=SUZUKI_TROTTER_QROM,
             rfq_spec=self.rfq_spec,
-            save_state_vector_per_atom_iteration=False
+            save_state_vector_per_atom_iteration=False  # False when we are just drawing
         )
 
         self.stm_block = SuzukiTrotterMethodBlock(
@@ -146,7 +147,9 @@ class Parameters:
             self.disc_spec,
             self.num_nucl_iters,
             self.num_elec_iters,
-            save_state_vector_per_atom_iteration=True,
+            method=SUZUKI_TROTTER_QROM,
+            rfq_spec=self.rfq_spec,
+            save_state_vector_per_atom_iteration=True  # True when we are running
         )
         stm = SuzukiTrotterMethodBlock(evo_spec, self.ene_spec, self.asy_spec)
 
