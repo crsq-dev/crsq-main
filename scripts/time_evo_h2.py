@@ -1,3 +1,7 @@
+"""
+   1-D simulation of two H atoms.
+"""
+
 import math, os, argparse
 import numpy as np
 import scipy.special as sp

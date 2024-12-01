@@ -12,7 +12,7 @@ from crsq_heap.heap import Frame, Binding
 logger = logging.getLogger(__name__)
 LOG_TIME_THRESH=1
 
-class StateEmbedGate2D(Frame):
+class StateEmbedGate3D(Frame):
     """ State embedding gate for 2D data in the form data[p,r,c]
         p is plane index, r is row index, c is column index
     """

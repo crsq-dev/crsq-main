@@ -10,7 +10,7 @@ import numpy as np
 
 from qiskit import QuantumRegister
 from crsq_heap.heap import Frame, Binding
-from crsq.blocks import antisymmetrization, embed, embed2
+from crsq.blocks import antisymmetrization, embed, embed2, embed2D, embed3D
 
 logger = logging.getLogger(__name__)
 LOG_TIME_THRESH = 1
@@ -330,32 +330,40 @@ class SlaterDeterminantPreparationBlock(Frame):
             e = electrons[i]
             array = e.flatten() # 1D/2D/3D array to 1D array
             if dim == 1:
-                reg = self._eregs[i][0]
+                self._set_orbital_data_1d(array, self._eregs[i])
             elif dim == 2:
-                reg = QuantumRegister(name="exy", bits=self._eregs[i][1][:] + self._eregs[i][0][:])
+                self._set_orbital_data_2d(array, self._eregs[i])
             elif dim == 3:
-                reg = QuantumRegister(name="exyz", bits=self._eregs[i][2][:] + self._eregs[i][1][:] + self._eregs[i][0][:])
-            if self._ene_spec.should_use_embed2:
-                emb = embed2.StateEmbedGate2(array)
-            else:
-                emb = embed.StateEmbedGate(array)
-            self.invoke(emb.bind(q=reg))
+                self._set_orbital_data_3d(array, self._eregs[i])
 
         nuclei = ene_spec.initial_nucleus_orbitals[self._energy_state_index]
         for a in range(self._num_nuclei):
             n = nuclei[a]
             array = n.flatten()
             if dim == 1:
-                reg = self._nregs[a][0]
+                self._set_orbital_data_1d(array, self._nregs[a])
             elif dim == 2:
-                reg = QuantumRegister(name="nxy", bits=self._nregs[a][1][:] + self._nregs[a][0][:])
+                self._set_orbital_data_2d(array, self._nregs[a])
             elif dim == 3:
-                reg = QuantumRegister(name="nxyz", bits=self._nregs[a][2][:] + self._nregs[a][1][:] + self._nregs[a][0][:])
-            if self._ene_spec.should_use_embed2:
-                emb = embed2.StateEmbedGate2(array)
-            else:
-                emb = embed.StateEmbedGate(array)
-            self.invoke(emb.bind(q=reg))
+                self._set_orbital_data_3d(array, self._nregs[a])
+
+    def _set_orbital_data_1d(self, array: np.ndarray, regs: List[QuantumRegister]):
+        """ set orbital data for 1D """
+        if self._ene_spec.should_use_embed2:
+            emb = embed2.StateEmbedGate2(array)
+        else:
+            emb = embed.StateEmbedGate(array)
+        self.invoke(emb.bind(q=regs[0]))
+
+    def _set_orbital_data_2d(self, array: np.ndarray, regs: List[QuantumRegister]):
+        """ set orbital data for 2D """
+        emb = embed2D.StateEmbedGate2D(array)
+        self.invoke(emb.bind(row=regs[1], col=regs[0]))
+
+    def _set_orbital_data_3d(self, array: np.ndarray, regs: List[QuantumRegister]):
+        """ set orbital data for 3D """
+        emb = embed3D.StateEmbedGate3D(array)
+        self.invoke(emb.bind(plane=regs[2], row=regs[1], col=regs[0]))
 
     def _build_antisymmetrization(self):
         """ build the antisymmetrization block """
