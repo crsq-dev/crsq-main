@@ -327,8 +327,7 @@ class SlaterDeterminantPreparationBlock(Frame):
         ene_spec = self._ene_spec
         electrons = ene_spec.initial_electron_orbitals[self._energy_state_index]
         for i in range(self._num_electrons):
-            e = electrons[i]
-            array = e.flatten() # 1D/2D/3D array to 1D array
+            array = electrons[i]
             if dim == 1:
                 self._set_orbital_data_1d(array, self._eregs[i])
             elif dim == 2:
@@ -338,8 +337,7 @@ class SlaterDeterminantPreparationBlock(Frame):
 
         nuclei = ene_spec.initial_nucleus_orbitals[self._energy_state_index]
         for a in range(self._num_nuclei):
-            n = nuclei[a]
-            array = n.flatten()
+            array = nuclei[a]
             if dim == 1:
                 self._set_orbital_data_1d(array, self._nregs[a])
             elif dim == 2:

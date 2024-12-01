@@ -143,8 +143,8 @@ class RfqElectronPotentialBlock(heap.Frame):
                 ndata = nuclei_data[num_moving_nuclei + ia]
                 pos = ndata["pos"]
                 if not (pos[0] == 0 and pos[1] == 0):
-                    axc = scope.constant(int(pos[0]/wfr_spec.delta_q))
-                    ayc = scope.constant(int(pos[1]/wfr_spec.delta_q))
+                    axc = scope.constant(int(pos[0]/wfr_spec.delta_q), wfr_spec.num_coordinate_bits)
+                    ayc = scope.constant(int(pos[1]/wfr_spec.delta_q), wfr_spec.num_coordinate_bits)
                     exr -= axc
                     eyr -= ayc
                 scope.build_circuit()

@@ -253,6 +253,8 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         self._disc_spec = evo_spec.disc_spec
         self._wfr_spec = self._ham_spec.wfr_spec
         self._use_motion_block_gates = use_motion_block_gates
+        if (evo_spec.method == spec.SUZUKI_TROTTER_QROM and not use_motion_block_gates):
+            raise ValueError("SuzukiTrotterMethodBlock: QROM requires use_motion_block_gates=True")
         # registers
         self._e_index_regs: List[List[QuantumRegister]]
         self._n_index_regs: List[List[QuantumRegister]]
@@ -392,6 +394,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
                     nregs=self._n_index_regs
                 ), invoke_as_instruction=True)
             return
+        logger.info("ElectronMotionBlock: using individual steps")
         evo_spec = self._evo_spec
         if evo_spec.should_calculate_potential_term and wfr_spec.has_elec_potential_term:
             self._build_elec_potential_step()

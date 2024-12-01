@@ -68,7 +68,7 @@ class Parameters:
         self.disc_spec = DiscretizationSpec(self.delta_t)
         self.asy_spec = AntisymmetrizationSpec(self.wfr_spec, self.antisym_method)
         self.nuclei_data = [
-            {"mass": 1680, "charge": 1, "pos": (self.M // 2, self.M // 2)}
+            {"mass": 1680, "charge": 1, "pos": (0, 0)}
         ]
 
         self.ham_spec = HamiltonianSpec(self.wfr_spec, nuclei_data=self.nuclei_data)
@@ -83,8 +83,8 @@ class Parameters:
         self.xv = np.zeros((M,M))
         self.yv = np.zeros((M,M))
         for i in range(M):
-            self.yv[:,i] = np.linspace(-self.L/2, self.L/2-self.dq, M)
-            self.xv[i,:] = np.linspace(-self.L/2, self.L/2-self.dq, M)
+            self.yv[:,i] = np.linspace(-0, self.L-self.dq, M)
+            self.xv[i,:] = np.linspace(-0, self.L-self.dq, M)
         self.x0 = 0
         self.y0 = 0
         # quantum numbers
@@ -116,19 +116,14 @@ class Parameters:
         )
 
         self.stm_block = SuzukiTrotterMethodBlock(
-            self.evo_spec, self.ene_spec, self.asy_spec
+            self.evo_spec, self.ene_spec, self.asy_spec, use_motion_block_gates=True
         )
 
-        logger.info("draw the circuit")
 
         fname = self.outdir + "/h2d.circuit.png"
         self.stm_block.circuit.draw(output="mpl", filename=fname, scale=0.6)
+        logger.info("draw the circuit to %s", fname)
 
-        # draw the circuit
-
-        epot = self.stm_block.build_elec_potential_block()
-        fname = self.outdir + "/h2d.circuit.elec_potential.png"
-        epot.circuit.draw(output="mpl", filename=fname, scale=0.6)
 
     def run_circuit(self):
         # run the simulator
@@ -151,7 +146,8 @@ class Parameters:
             rfq_spec=self.rfq_spec,
             save_state_vector_per_atom_iteration=True  # True when we are running
         )
-        stm = SuzukiTrotterMethodBlock(evo_spec, self.ene_spec, self.asy_spec)
+        stm = SuzukiTrotterMethodBlock(
+            evo_spec, self.ene_spec, self.asy_spec, use_motion_block_gates=True)
 
         circ = stm.circuit
         logger.info("transpile START")
@@ -229,7 +225,6 @@ if __name__ == "__main__":
     )
     parser.add_argument("--device", type=str, default="CPU")
     parser.add_argument("--enable-cuStateVec", type=str, default="False")
-    parser.add_argument("--dim", type=int, default=1)
     parser.add_argument("--precision", type=str, default="single")
     parser.add_argument("--bits", type=int, default=5)
     parser.add_argument("--num-nucl-iters", type=int, default=1)
@@ -239,7 +234,9 @@ if __name__ == "__main__":
 
     use_cuStateVec = "cuStateVec" if args.enable_cuStateVec == "True" else "statevector"
 
-    tag = f"{args.device}_{use_cuStateVec}_{args.dim}D_{args.precision}_{args.bits}b"
+    dim = 2
+
+    tag = f"{args.device}_{use_cuStateVec}_{dim}D_{args.precision}_{args.bits}b"
 
     outdir = "output/" + tag
     os.makedirs(outdir, exist_ok=True)
@@ -253,20 +250,21 @@ if __name__ == "__main__":
     logging.getLogger('crsq').setLevel(logging.INFO)
     logger.setLevel(logging.INFO)
 
+    logger.info("==== Starting ====")
     logger.info("Device : %s", args.device)
     logger.info("enable_cuStateVec : %s", args.enable_cuStateVec)
-    logger.info("Dimension : %s", args.dim)
     logger.info("Precision : %s", args.precision)
     logger.info("num nucl iters : %d", args.num_nucl_iters)
     logger.info("num elec iters : %d", args.num_elec_iters)
     logger.info("use saved data : %s", args.use_saved_data)
     logger.info("Tag : %s", tag)
+    logger.info("outdir : %s", outdir)
 
     par = Parameters(
         outdir,
         args.device,
         args.enable_cuStateVec == "True",
-        args.dim,
+        dim,
         args.precision,
         args.bits,
         args.num_nucl_iters,
