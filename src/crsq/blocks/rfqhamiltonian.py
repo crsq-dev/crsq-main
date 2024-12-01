@@ -34,9 +34,9 @@ def check_time(label: str):
 
 class RfqPotentialSpec:
     """Args:
-    wfr_spec: WaveFunctionRegisterSpec
-    elec_elec_potential_func: function of distance between two electrons
-    elec_nucl_potential_func: function of distance between an electron and a nucleus
+        param:wfr_spec: WaveFunctionRegisterSpec
+        param:elec_elec_potential_func: func(r: float, dq: float) -> float: function of distance between two electrons
+        param:elec_nucl_potential_func: func(r: float, dq: float) -> float: function of distance between an electron and a nucleus
     """
 
     def __init__(
