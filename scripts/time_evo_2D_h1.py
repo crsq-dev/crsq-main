@@ -1,9 +1,10 @@
 import math, os, argparse
 # import numpy as np
 import cupy as np
-from matplotlib.axes import Axes
-import scipy.special as sp
 from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
+import cmasher as cmr
+import scipy.special as sp
 
 from crsq.blocks.antisymmetrization import AntisymmetrizationSpec
 from crsq.blocks.discretization import DiscretizationSpec
@@ -25,10 +26,14 @@ import logging
 logger = logging.getLogger("TEV")
 
 def elec_proton_potential(r, dq):
+    if r + dq == 0:
+        raise ValueError("r+dq == 0")
     return -1/(r+dq)
 
 def elec_elec_potential(r, dq):
-    return 1/(r+0.2)
+    if r + dq == 0:
+        raise ValueError("r+dq == 0")
+    return 1/(r+dq)
 
 
 # build the simulator
@@ -53,7 +58,7 @@ class Parameters:
         self.dim = dim  # 1 dimension
         self.n1 = n1  # bits per coordinate
         self.M = 1 << n1
-        self.L = 16  # 16 bohr
+        self.L = 32  # bohrs
         self.dq = self.L / self.M
         self.eta = 1  # num of electrons
         self.Ln = 0  # moving nucleus
@@ -78,16 +83,22 @@ class Parameters:
 
         self.rfq_spec = RfqPotentialSpec(self.wfr_spec, elec_elec_potential, elec_proton_potential)
 
+        logger.info("dq: %f", self.dq)
+
     def draw_circuits(self):
 
         M = self.M
-        xvals = np.linspace(-self.L/2, self.L/2-self.dq, M)
-        yvals = np.linspace(-self.L/2, self.L/2-self.dq, M)
-        signed_xvals = np.append(xvals[M//2:], xvals[0:M//2])
-        signed_yvals = np.append(yvals[M//2:], yvals[0:M//2])
-        sxv, syv = np.meshgrid(signed_xvals, signed_yvals)
-        self.xv = sxv
-        self.yv = syv
+        # unsigned index
+        ix = np.linspace(0, M-1, M)
+        iy = np.linspace(0, M-1, M)
+        # signed index
+        six = (ix + M//2) % M - M//2
+        siy = (iy + M//2) % M - M//2
+        qx = six * self.dq
+        qy = siy * self.dq
+        gx, gy = np.meshgrid(qx, qy)
+        self.xv = gx
+        self.yv = gy
 
         self.x0 = 0
         self.y0 = 0
@@ -169,6 +180,7 @@ class Parameters:
         label = self.evo_spec.make_state_vector_label(t)
         sv = results.data()[label]
         fname = self.outdir + "/" + self.evo_spec.make_state_vector_file_name(t)
+        logger.info("State vector label: %s", label)
         logger.info("Saving to : %s", fname)
         svec.save_to_file(fname, sv, eps=1e-12)
 
@@ -187,7 +199,7 @@ class Parameters:
             axs[0].legend()
             axs[1].legend()
             axs[2].legend()
-            fig.savefig(self.outdir + f"/e0_{self.n1}b.{self.num_nucl_iters}n.{self.num_elec_iters}e.t{t}.png")
+            fig.savefig(self.outdir + f"/e0_{self.n1}b.{self.num_nucl_iters}n.{self.num_elec_iters}e.t{t:04.3f}.png")
 
     def _add_plot(self, axs: list[Axes], time, xg, yg):
         fname = self.outdir + "/" + self.evo_spec.make_state_vector_file_name(time)
@@ -195,17 +207,24 @@ class Parameters:
         qc = self.stm_block.circuit
         sv = svec.read_from_file(fname)
         np_data2d = svec.extract_dist2d(qc, sv, "e0y", "e0x")
-        data2d = np.array(np_data2d)
+        data2d = np.zeros((self.M, self.M), dtype=np.complex64)
+        for ix in range(self.M):
+            for iy in range(self.M):
+                data2d[(ix+self.M//2) % self.M, (iy+self.M//2) % self.M] = np_data2d[ix, iy]
         norm = np.linalg.norm(data2d)
         logger.info("norm(t=%d)=%f", time, norm)
+        qx = np.linspace(-self.L/2, self.L/2-self.dq, self.M)
+        qy = np.linspace(-self.L/2, self.L/2-self.dq, self.M)
+        xg, yg = np.meshgrid(qx, qy)
         np_xg = np.asnumpy(xg)
         np_yg = np.asnumpy(yg)
         np_ab = np.asnumpy(np.abs(data2d) / self.dq)
         np_re = np.asnumpy(np.real(data2d) / self.dq)
         np_im = np.asnumpy(np.imag(data2d) / self.dq)
-        axs[0].plot_surface(np_xg, np_yg, np_ab, label=f"t={time}")
-        axs[1].plot_surface(np_xg, np_yg, np_re, label=f"t={time}")
-        axs[2].plot_surface(np_xg, np_yg, np_im, label=f"t={time}")
+        colormap = plt.get_cmap("cmr.guppy")
+        axs[0].plot_surface(np_xg, np_yg, np_ab, label=f"t={time}", cmap=colormap)
+        axs[1].plot_surface(np_xg, np_yg, np_re, label=f"t={time}", cmap=colormap)
+        axs[2].plot_surface(np_xg, np_yg, np_im, label=f"t={time}", cmap=colormap)
 
 
 def run_experiment(par: Parameters, tag: str):
