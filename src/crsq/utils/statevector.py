@@ -17,17 +17,22 @@ def save_to_file(path: str, sv: Statevector, eps=1.0e-10):
     with open(path, "w", encoding="utf-8") as f:
         d = int(math.log2(sv.dim))
         f.write(f"{d}\n")
+        n = len(sv.data)
+        f.write(f"{n}\n")
         for i, z in enumerate(sv.data):
             if abs(z) > eps:
                 key = bin((1<<d) + i)[-d:]
                 f.write(f"{key},{z.real},{z.imag}\n")
+            elif math.isnan(z.real):
+                raise ValueError("NaN detected in state vector for entry " + str(i))
 
 def read_from_file(path: str) -> Statevector:
     """ Read a statevector from a file created by save_to_file.
     """
     with open(path, "r", encoding="utf-8") as f:
         d = int(f.readline())
-        data = np.zeros(2**d, dtype=np.complex128)
+        n = int(f.readline())
+        data = np.zeros(n, dtype=np.complex128)
         for line in f:
             cols = line.split(',')
             key = cols[0]

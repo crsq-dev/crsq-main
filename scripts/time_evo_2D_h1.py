@@ -25,15 +25,15 @@ import logging
 
 logger = logging.getLogger("TEV")
 
-def elec_proton_potential(r, dq):
-    if r + dq == 0:
-        raise ValueError("r+dq == 0")
-    return -1/(r+dq)
+def elec_proton_potential(r: float) -> float:
+    if r == 0:
+        raise ValueError("r == 0")
+    return -1/r
 
-def elec_elec_potential(r, dq):
-    if r + dq == 0:
-        raise ValueError("r+dq == 0")
-    return 1/(r+dq)
+def elec_elec_potential(r: float) -> float:
+    if r == 0:
+        raise ValueError("r == 0")
+    return 1/r
 
 
 # build the simulator
@@ -45,6 +45,8 @@ class Parameters:
         device="GPU",
         enable_cuStateVec=True,
         dim=2,
+        qn = 0,
+        qm = 0,
         precision="single",
         n1=5,
         num_nucl_iters=1,
@@ -56,9 +58,11 @@ class Parameters:
         self.enable_cuStateVec = enable_cuStateVec
         self.precision = precision
         self.dim = dim  # 1 dimension
+        self.qn = qn
+        self.qm = qm
         self.n1 = n1  # bits per coordinate
         self.M = 1 << n1
-        self.L = 32  # bohrs
+        self.L = 16  # bohrs
         self.dq = self.L / self.M
         self.eta = 1  # num of electrons
         self.Ln = 0  # moving nucleus
@@ -103,10 +107,10 @@ class Parameters:
         self.x0 = 0
         self.y0 = 0
         # quantum numbers
-        qn = 0
-        qm = 0
+        qn = self.qn
+        qm = self.qm
         delta_q = self.dq / 2
-        psifunc2d = PsiH2D(self.x0, self.y0, delta_q, qn, qm)
+        psifunc2d = PsiH2D(self.x0 + delta_q, self.y0 + delta_q, qn, qm)
         psixy = psifunc2d(self.xv, self.yv)
         ini_electrons = [psixy]
         ini_configs = [ini_electrons]
@@ -152,17 +156,18 @@ class Parameters:
         )
         backend.set_options(max_parallel_threads=0)
 
-        evo_spec = TimeEvolutionSpec(
+        self.evo_spec = TimeEvolutionSpec(
             self.ham_spec,
             self.disc_spec,
             self.num_nucl_iters,
             self.num_elec_iters,
             method=SUZUKI_TROTTER_QROM,
             rfq_spec=self.rfq_spec,
-            save_state_vector_per_atom_iteration=True  # True when we are running
+            save_state_vector_per_atom_iteration=True,  # True when we are running
+            save_state_vector_per_qft=True
         )
         stm = SuzukiTrotterMethodBlock(
-            evo_spec, self.ene_spec, self.asy_spec, use_motion_block_gates=True)
+            self.evo_spec, self.ene_spec, self.asy_spec, use_motion_block_gates=True)
 
         circ = stm.circuit
         logger.info("transpile START")
@@ -177,12 +182,24 @@ class Parameters:
             self._save_result_sv(results, t)
 
     def _save_result_sv(self, results, t):
-        label = self.evo_spec.make_state_vector_label(t)
-        sv = results.data()[label]
-        fname = self.outdir + "/" + self.evo_spec.make_state_vector_file_name(t)
-        logger.info("State vector label: %s", label)
-        logger.info("Saving to : %s", fname)
-        svec.save_to_file(fname, sv, eps=1e-12)
+        if self.evo_spec.should_save_state_vector_per_qft:
+            logger.info("save state vector per qft plus atom iteration")
+            suffixes = [ "_qftd0", "_qftd1", ""]
+        else:
+            logger.info("save state vector per atom iteration")
+            suffixes = [""]
+        for suffix in suffixes:
+            label = self.evo_spec.make_state_vector_label(t, suffix)
+            if label in results.data():
+                sv = results.data()[label]
+                fname = self.outdir + "/" + self.evo_spec.make_state_vector_file_name(t, suffix)
+                logger.info("State vector label: %s", label)
+                if os.path.exists(fname):
+                    logger.info("removing old file : %s", fname)
+                    os.remove(fname)
+                logger.info("Saving to : %s", fname)
+                svec.save_to_file(fname, sv, eps=1e-12)
+
 
     def draw_graph(self):
         """draw the graph based on the results file."""
@@ -249,14 +266,18 @@ if __name__ == "__main__":
     parser.add_argument("--bits", type=int, default=5)
     parser.add_argument("--num-nucl-iters", type=int, default=1)
     parser.add_argument("--num-elec-iters", type=int, default=1)
+    parser.add_argument("--qnum-n", type=int, default=1)
+    parser.add_argument("--qnum-m", type=int, default=0)
     parser.add_argument("--use-saved-data", type=str, default="False")
     args = parser.parse_args()
 
     use_cuStateVec = "cuStateVec" if args.enable_cuStateVec == "True" else "statevector"
 
     dim = 2
+    qn = args.qnum_n
+    qm = args.qnum_m
 
-    tag = f"{args.device}_{use_cuStateVec}_{dim}D_{args.precision}_{args.bits}b"
+    tag = f"{args.device}_{use_cuStateVec}_{dim}D_n{qn}_m{qm}_{args.precision}_{args.bits}b"
 
     outdir = "output/" + tag
     os.makedirs(outdir, exist_ok=True)
@@ -264,7 +285,7 @@ if __name__ == "__main__":
         format="%(asctime)s %(levelname)-8s [%(name)s] %(message)s",
         filename=outdir + "/time_evo_2D_h1.log",
         encoding="utf-8",
-        level=logging.WARNING,
+        level=logging.INFO,
         datefmt="%Y-%m-%d %H:%M:%S",
     )
     logging.getLogger('crsq').setLevel(logging.INFO)
@@ -276,6 +297,8 @@ if __name__ == "__main__":
     logger.info("Precision : %s", args.precision)
     logger.info("num nucl iters : %d", args.num_nucl_iters)
     logger.info("num elec iters : %d", args.num_elec_iters)
+    logger.info("qn : %d", args.qnum_n)
+    logger.info("qm : %d", args.qnum_m)
     logger.info("use saved data : %s", args.use_saved_data)
     logger.info("Tag : %s", tag)
     logger.info("outdir : %s", outdir)
@@ -285,10 +308,17 @@ if __name__ == "__main__":
         args.device,
         args.enable_cuStateVec == "True",
         dim,
+        args.qnum_n,
+        args.qnum_m,
         args.precision,
         args.bits,
         args.num_nucl_iters,
         args.num_elec_iters,
         args.use_saved_data == "True",
     )
-    run_experiment(par, tag)
+    try:
+        run_experiment(par, tag)
+    except ValueError as e:
+        logger.error("ValueError: %s", e)
+        print("ValueError: ", e)
+

@@ -20,7 +20,8 @@ class TimeEvolutionSpec:
                  num_elec_per_atom_iterations: int,
                  method: str = SUZUKI_TROTTER_ARITHMETIC,
                  rfq_spec: rfqhamiltonian.RfqPotentialSpec = None,
-                 save_state_vector_per_atom_iteration: bool = False
+                 save_state_vector_per_atom_iteration: bool = False,
+                 save_state_vector_per_qft: bool = False
                  ):
         assert isinstance(ham_spec, hamiltonian.HamiltonianSpec)
         assert isinstance(disc_spec, discretization.DiscretizationSpec)
@@ -37,6 +38,7 @@ class TimeEvolutionSpec:
         self._should_calculate_potential_term = True
         self._should_calculate_kinetic_term = True
         self._should_save_state_vector_per_atom_iteration = save_state_vector_per_atom_iteration
+        self._should_save_state_vector_per_qft = save_state_vector_per_qft
         self._should_apply_qft = True
         valid_methods = [SUZUKI_TROTTER_ARITHMETIC, SUZUKI_TROTTER_QROM]
         if method not in valid_methods:
@@ -126,13 +128,18 @@ class TimeEvolutionSpec:
         """ flag that tells state vector should be saved per atom iteration """
         return self._should_save_state_vector_per_atom_iteration
     
-    def make_state_vector_file_name(self, time: float):
+    def make_state_vector_file_name(self, time: float, suffix = ""):
         """ make state vector file name """
-        return f"state_vector_{time:04.3f}.csv"
+        return f"state_vector_{time:04.3f}{suffix}.csv"
 
-    def make_state_vector_label(self, time: float):
+    def make_state_vector_label(self, time: float, suffix = ""):
         """ make state vector label """
-        return f"sv_t{time:04.3f}"
+        return f"sv_t{time:04.3f}{suffix}"
+
+    @property
+    def should_save_state_vector_per_qft(self) -> bool:
+        """ flag that tells state vector should be saved per qft """
+        return self._should_save_state_vector_per_qft
 
     @property
     def method(self):

@@ -2,6 +2,7 @@
 """
 
 from typing import List
+from collections.abc import Callable
 import time
 import logging
 from contextlib import contextmanager
@@ -42,8 +43,8 @@ class RfqPotentialSpec:
     def __init__(
         self,
         wfr_spec: wave_function.WaveFunctionRegisterSpec,
-        elec_elec_potential_func,
-        elec_nucl_potential_func,
+        elec_elec_potential_func: Callable[[float], float],
+        elec_nucl_potential_func: Callable[[float], float],
     ):
         assert isinstance(wfr_spec, wave_function.WaveFunctionRegisterSpec)
         self._wfr_spec = wfr_spec
@@ -53,13 +54,13 @@ class RfqPotentialSpec:
     @property
     def wfr_spec(self):
         return self._wfr_spec
+    
+    @property
+    def elec_nucl_potential_func(self) -> Callable[[float], float]:
+        return self._elec_nucl_potential_func
 
     @property
-    def radial_func(self):
-        return self._elec_elec_potential_func
-
-    @property
-    def elec_elec_potential_func(self):
+    def elec_elec_potential_func(self) -> Callable[[float], float]:
         return self._elec_elec_potential_func
 
 
@@ -94,6 +95,14 @@ class RfqElectronPotentialBlock(heap.Frame):
     def build_circuits(self):
         self._build_elec_elec_potential_terms()
         self._build_elec_nucl_potential_terms()
+    
+    def _elec_elec_phase_shift(self, r: float):
+        """ -delta_t * Vee(r)"""
+        return - self._disc_spec.delta_t * self._rfq_spec.elec_elec_potential_func(r)
+
+    def _elec_nucl_phase_shift(self, r: float):
+        """ -delta_t * Ven(r)"""
+        return - self._disc_spec.delta_t * self._rfq_spec.elec_nucl_potential_func(r)
 
     def _build_elec_elec_potential_terms(self):
         wfr_spec = self._wfr_spec
@@ -114,7 +123,7 @@ class RfqElectronPotentialBlock(heap.Frame):
                 rfq = radial_func_qrom.RadialFuncQrom(
                     wfr_spec.num_coordinate_bits,
                     wfr_spec.delta_q,
-                    rfq_spec.elec_elec_potential_func,
+                    self._elec_elec_phase_shift,
                 )
                 self.invoke(rfq.bind(x=x1r.register, y=y1r.register))
 
@@ -152,7 +161,7 @@ class RfqElectronPotentialBlock(heap.Frame):
                 rfq = radial_func_qrom.RadialFuncQrom(
                     wfr_spec.num_coordinate_bits,
                     wfr_spec.delta_q,
-                    rfq_spec._elec_nucl_potential_func
+                    self._elec_nucl_phase_shift
                 )
                 self.invoke(rfq.bind(x=exr.register, y=eyr.register))
 

@@ -40,6 +40,7 @@ class ElectronMotionBlock(heap.Frame):
     """
     def __init__(self,
                  evo_spec: spec.TimeEvolutionSpec,
+                 sim_time: float,
                  label=" TEV_e(x)", allocate=True, build=True):
         super().__init__(label=label)
         t1 = time.time()
@@ -47,6 +48,7 @@ class ElectronMotionBlock(heap.Frame):
         self._ham_spec = evo_spec.ham_spec
         self._disc_spec = evo_spec.disc_spec
         self._wfr_spec = self._ham_spec.wfr_spec
+        self.sim_time = sim_time
         # registers
         self._e_index_regs: List[List[QuantumRegister]]
         self._n_index_regs: List[List[QuantumRegister]]
@@ -133,12 +135,25 @@ class ElectronMotionBlock(heap.Frame):
 
     def _build_apply_electron_qft_step(self, inverse: bool = False):
         """ apply QFT on all index registers """
+        if inverse and self._evo_spec.should_save_state_vector_per_qft:
+            # record before qft dagger
+            suffix = "_qftd0"
+            label = self._evo_spec.make_state_vector_label(self.sim_time, suffix)
+            self.circuit.save_statevector(label)
+
         block = qft.QFTOnWaveFunctionsBlock(self._wfr_spec, on_electrons=True, inverse=inverse)
         # The QFT block contains non-gate instructions.
         with check_time("QFTOnWaveFunctionsBlock(e).invoke"):
             self.invoke(block.bind(
                         eregs=self._e_index_regs),
                         invoke_as_instruction=True)
+
+        if inverse and self._evo_spec.should_save_state_vector_per_qft:
+            # record after qft dagger
+            suffix = "_qftd1"
+            label = self._evo_spec.make_state_vector_label(self.sim_time, suffix)
+            self.circuit.save_statevector(label)
+
 
     def _build_elec_kinetic_step(self):
         block = hamiltonian.ElectronKineticBlock(self._wfr_spec, self._disc_spec)
@@ -159,12 +174,14 @@ class NucleusMotionBlock(heap.Frame):
     """ H_np, QFT, H_nk, QFT\dagger """
     def __init__(self,
                  evo_spec: spec.TimeEvolutionSpec,
+                 sim_time: float,
                  label=" TEV_n(x)", allocate=True, build=True):
         super().__init__(label=label)
         self._evo_spec = evo_spec
         self._ham_spec = evo_spec.ham_spec
         self._disc_spec = evo_spec.disc_spec
         self._wfr_spec = self._ham_spec.wfr_spec
+        self._sim_time = sim_time
         # registers
         self._n_index_regs: List[List[QuantumRegister]]
         if allocate:
@@ -304,39 +321,44 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         evo_spec = self._evo_spec
         n_atom_it = evo_spec.num_atom_iterations
         n_elec_it = evo_spec.num_elec_per_atom_iterations
-        with qc.for_loop(range(n_atom_it)):
-            with qc.for_loop(range(n_elec_it)):
+        sim_time = 0.0
+        delta_t = self._evo_spec.disc_spec.delta_t
+        # with qc.for_loop(range(n_atom_it)):
+        #     with qc.for_loop(range(n_elec_it)):
+        for _atom_it in range(n_atom_it):
+            for _elec_it in range(n_elec_it):
                 if evo_spec.should_calculate_electron_motion:
-                    self._build_electron_motion_step()
+                    self._build_electron_motion_step(sim_time)
+                sim_time += delta_t
             if evo_spec.should_calculate_nucleus_motion:
-                self._build_nuclei_motion_block()
+                self._build_nuclei_motion_block(sim_time)
 
     def _build_time_evolution_circuit_with_save(self):
         qc = self.circuit
         evo_spec = self._evo_spec
         n_atom_it = evo_spec.num_atom_iterations
         n_elec_it = evo_spec.num_elec_per_atom_iterations
-        time = 0.0
+        sim_time = 0.0
         delta_t = self._evo_spec.disc_spec.delta_t
 
         # cannot save state vector for t=0.
         # we need to go through the circuit one loop to get all registers allocated.
         # self._save_state_vector(time)
 
-        with qc.for_loop(range(n_atom_it)):
-            with qc.for_loop(range(n_elec_it)):
+        # with qc.for_loop(range(n_atom_it)):
+        #     with qc.for_loop(range(n_elec_it)):
 
-        # for _atom_it in range(n_atom_it):
-        #     for _elec_it in range(n_elec_it):
+        for _atom_it in range(n_atom_it):
+            for _elec_it in range(n_elec_it):
                 if evo_spec.should_calculate_electron_motion:
-                    self._build_electron_motion_step()
-                time += delta_t
+                    self._build_electron_motion_step(sim_time)
+                sim_time += delta_t
             if evo_spec.should_calculate_nucleus_motion:
-                self._build_nuclei_motion_block()
-            self._save_state_vector(time)
+                self._build_nuclei_motion_block(sim_time)
+            self._save_state_vector(sim_time)
 
-    def _save_state_vector(self, time):
-        label = self._evo_spec.make_state_vector_label(time)
+    def _save_state_vector(self, sim_time):
+        label = self._evo_spec.make_state_vector_label(sim_time)
         logger.info("save_statevector: %s", label)
         self.circuit.save_statevector(label=label)
 
@@ -377,16 +399,16 @@ class SuzukiTrotterMethodBlock(heap.Frame):
                 )
             )
 
-    def build_electron_motion_block(self):
-        elec_motion_block = ElectronMotionBlock(self._evo_spec)
+    def build_electron_motion_block(self, sim_time: float):
+        elec_motion_block = ElectronMotionBlock(self._evo_spec, sim_time)
         return elec_motion_block
 
-    def _build_electron_motion_step(self):
+    def _build_electron_motion_step(self, sim_time):
         wfr_spec = self._wfr_spec
         if wfr_spec.num_electrons == 0:
             return
         if self._use_motion_block_gates:
-            elec_motion_block = self.build_electron_motion_block()
+            elec_motion_block = self.build_electron_motion_block(sim_time)
             logger.info("ElectronMotionBlock.num_qubits = %d", elec_motion_block.circuit.num_qubits)
             with check_time("ElectronMotionBlock.invoke"):
                 self.invoke(elec_motion_block.bind(
@@ -405,11 +427,11 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         if evo_spec.should_apply_qft:
             self._build_apply_electron_qft_step()
 
-    def _build_nuclei_motion_block(self):
+    def _build_nuclei_motion_block(self, sim_time: float):
         if self._wfr_spec.num_moving_nuclei == 0:
             return
         if self._use_motion_block_gates:
-            nucl_motion_block = NucleusMotionBlock(self._evo_spec)
+            nucl_motion_block = NucleusMotionBlock(self._evo_spec, sim_time)
             with check_time("NucleusMotionBlock.invoke"):
                 self.invoke(nucl_motion_block.bind(
                     nregs=self._n_index_regs), invoke_as_instruction=True)

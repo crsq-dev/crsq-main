@@ -17,12 +17,13 @@ class PsiH2D:
             n: int : primary quantum number
             m: int : secondary quantum number
     """
-    def __init__(self, Qx0: float, Qy0: float, delta_q:float, n: int, m: int):
+    def __init__(self, Qx0: float, Qy0: float, n: int, m: int):
         self._Qx0 = Qx0
         self._Qy0 = Qy0
+        if abs(m) > n:
+            raise ValueError(f"Invalid quantum numbers: n={n}, m={m}. must be |m| <= n")
         self._n = n
         self._m = m
-        self._delta_q = delta_q
 
     def __call__(self, qxv: np.ndarray, qyv: np.ndarray) -> np.ndarray:
         """ calculate the wave function of the hydrogen atom in 2D model.
@@ -37,8 +38,8 @@ class PsiH2D:
         m = self._m
         absm = abs(m)
         q0 = 1/(n+1/2)
-        dxv = qxv - (self._Qx0 + self._delta_q)
-        dyv = qyv - (self._Qy0 + self._delta_q)
+        dxv = qxv - (self._Qx0)
+        dyv = qyv - (self._Qy0)
         rho = np.sqrt(np.square(dxv) + np.square(dyv))
         A = math.sqrt((q0**3 * math.factorial(n-absm))/(math.pi*math.factorial(n+absm)))
         q0rho = q0*rho
