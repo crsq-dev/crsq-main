@@ -45,10 +45,11 @@ class ElectronMotionBlock(heap.Frame):
         super().__init__(label=label)
         t1 = time.time()
         self._evo_spec = evo_spec
+        self._rfq_spec = evo_spec.rfq_spec
         self._ham_spec = evo_spec.ham_spec
         self._disc_spec = evo_spec.disc_spec
         self._wfr_spec = self._ham_spec.wfr_spec
-        self.sim_time = sim_time
+        self._sim_time = sim_time
         # registers
         self._e_index_regs: List[List[QuantumRegister]]
         self._n_index_regs: List[List[QuantumRegister]]
@@ -111,7 +112,7 @@ class ElectronMotionBlock(heap.Frame):
 
     def _build_elec_potential_step_arithmetic(self):
         block = self.build_elec_potential_block_arithmetic()
-        logger.info("ElectronPotentialBlock.num_qubits = %d", block.circuit.num_qubits)
+        logger.info("ElectronPotentialBlock[ARITHMETIC].num_qubits = %d", block.circuit.num_qubits)
         with check_time("ElectronPotentialBlock.invoke"):
             self.invoke(block.bind(eregs=self._e_index_regs, nregs=self._n_index_regs))
 
@@ -121,11 +122,19 @@ class ElectronMotionBlock(heap.Frame):
             self._ham_spec, self._disc_spec, allocate=allocate, build=build)
         return block
 
+    def _save_state_vector_with_suffix(self, suffix: str):
+        label = self._evo_spec.make_state_vector_label(self._sim_time, suffix)
+        logger.info("save_statevector: %s, num_qubits = %d", label, self.circuit.num_qubits)
+        self.circuit.save_statevector(label=label)
+
     def _build_elec_potential_step_qrom(self):
         block = self.build_elec_potential_block_qrom()
-        logger.info("RfqElectronPotentialBlock.num_qubits = %d", block.circuit.num_qubits)
+        # we cannot save state vector at this point.
+        logger.info("RfqElectronPotentialBlock[QROM].num_qubits = %d", block.circuit.num_qubits)
         with check_time("RfqElectronPotentialBlock.invoke"):
-            self.invoke(block.bind(eregs=self._e_index_regs, nregs=self._n_index_regs))
+            self.invoke(block.bind(eregs=self._e_index_regs, nregs=self._n_index_regs), invoke_as_instruction=True)
+        if self._rfq_spec.should_save_state_vector_per_qrom:
+            self._save_state_vector_with_suffix("_qrom1")
 
     def build_elec_potential_block_qrom(self, allocate=True, build=True):
         """ build a RfqElectronPotentialBlock instance."""
@@ -137,23 +146,16 @@ class ElectronMotionBlock(heap.Frame):
         """ apply QFT on all index registers """
         if inverse and self._evo_spec.should_save_state_vector_per_qft:
             # record before qft dagger
-            suffix = "_qftd0"
-            label = self._evo_spec.make_state_vector_label(self.sim_time, suffix)
-            self.circuit.save_statevector(label)
-
+            self._save_state_vector_with_suffix("_qft0")
         block = qft.QFTOnWaveFunctionsBlock(self._wfr_spec, on_electrons=True, inverse=inverse)
         # The QFT block contains non-gate instructions.
         with check_time("QFTOnWaveFunctionsBlock(e).invoke"):
             self.invoke(block.bind(
                         eregs=self._e_index_regs),
                         invoke_as_instruction=True)
-
         if inverse and self._evo_spec.should_save_state_vector_per_qft:
             # record after qft dagger
-            suffix = "_qftd1"
-            label = self._evo_spec.make_state_vector_label(self.sim_time, suffix)
-            self.circuit.save_statevector(label)
-
+            self._save_state_vector_with_suffix("_qft1")
 
     def _build_elec_kinetic_step(self):
         block = hamiltonian.ElectronKineticBlock(self._wfr_spec, self._disc_spec)
@@ -340,14 +342,12 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         n_elec_it = evo_spec.num_elec_per_atom_iterations
         sim_time = 0.0
         delta_t = self._evo_spec.disc_spec.delta_t
-
         # cannot save state vector for t=0.
         # we need to go through the circuit one loop to get all registers allocated.
         # self._save_state_vector(time)
 
         # with qc.for_loop(range(n_atom_it)):
         #     with qc.for_loop(range(n_elec_it)):
-
         for _atom_it in range(n_atom_it):
             for _elec_it in range(n_elec_it):
                 if evo_spec.should_calculate_electron_motion:

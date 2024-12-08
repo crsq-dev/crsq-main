@@ -85,8 +85,6 @@ class Parameters:
         self.use_saved_data = use_saved_data
         self.stm_block = None
 
-        self.rfq_spec = RfqPotentialSpec(self.wfr_spec, elec_elec_potential, elec_proton_potential)
-
         logger.info("dq: %f", self.dq)
 
     def draw_circuits(self):
@@ -124,6 +122,13 @@ class Parameters:
         # psix = np.zeros(M)
         # psiy = np.zeros(M)
 
+        self.rfq_spec = RfqPotentialSpec(
+            self.wfr_spec,
+            elec_elec_potential,
+            elec_proton_potential,
+            save_state_vector_per_qrom=False)
+
+
         self.evo_spec = TimeEvolutionSpec(
             self.ham_spec,
             self.disc_spec,
@@ -156,6 +161,12 @@ class Parameters:
         )
         backend.set_options(max_parallel_threads=0)
 
+        self.rfq_spec = RfqPotentialSpec(
+            self.wfr_spec,
+            elec_elec_potential,
+            elec_proton_potential,
+            save_state_vector_per_qrom=False)
+
         self.evo_spec = TimeEvolutionSpec(
             self.ham_spec,
             self.disc_spec,
@@ -164,7 +175,7 @@ class Parameters:
             method=SUZUKI_TROTTER_QROM,
             rfq_spec=self.rfq_spec,
             save_state_vector_per_atom_iteration=True,  # True when we are running
-            save_state_vector_per_qft=True
+            save_state_vector_per_qft=False
         )
         stm = SuzukiTrotterMethodBlock(
             self.evo_spec, self.ene_spec, self.asy_spec, use_motion_block_gates=True)
@@ -182,12 +193,15 @@ class Parameters:
             self._save_result_sv(results, t)
 
     def _save_result_sv(self, results, t):
+        suffixes = []
+        if self.evo_spec.rfq_spec.should_save_state_vector_per_qrom:
+            logger.info("save state vector per qrom iteration")
+            suffixes += ["_qrom0", "_qrom1"]
         if self.evo_spec.should_save_state_vector_per_qft:
-            logger.info("save state vector per qft plus atom iteration")
-            suffixes = [ "_qftd0", "_qftd1", ""]
-        else:
-            logger.info("save state vector per atom iteration")
-            suffixes = [""]
+            logger.info("save state vector per qft")
+            suffixes += ["_qftd1"]
+        logger.info("save state vector per atom iteration")
+        suffixes += [""]
         for suffix in suffixes:
             label = self.evo_spec.make_state_vector_label(t, suffix)
             if label in results.data():

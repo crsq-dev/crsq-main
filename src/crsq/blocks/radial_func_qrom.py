@@ -58,7 +58,9 @@ class RadialFuncQrom(Frame):
                 if j <= i and i < HM + 1:
                     x = i * self._dq
                     r = math.sqrt(x*x + y*y)
-                    psi = self._rfunc(r, self._dq/2)
+                    psi = self._rfunc(r + self._dq/2)
+                    if abs(psi) > math.pi:
+                        logger.warning("x=%f, y=%f, r=%f, psi=%f", x, y, r, psi) 
                     self._data[i, j] = psi
                     self._has_data_y[0, i, j] = psi != 0.0
                 else:
@@ -135,12 +137,14 @@ class RadialFuncQrom(Frame):
         qc.append(ari.cdk_comparator_gate(n), self._y[:] + self._x[:] + self._cz[:] + self._cr[0:1])
         for i in range(n):
             qc.cswap(self._cz[0], self._x[i], self._y[i])
+        qc.barrier()
+
         xi = 0
         yi = 0
         k = n - 1
-
         self._build_area(xi, yi, k, None, None)
 
+        qc.barrier()
         for i in range(n-1,-1,-1):
             qc.cswap(self._cz[0], self._x[i], self._y[i])
 

@@ -14,6 +14,7 @@ import crsq_heap.heap as heap
 def save_to_file(path: str, sv: Statevector, eps=1.0e-10):
     """ Save components of a statevector to a file
     """
+    nan_was_detected = False
     with open(path, "w", encoding="utf-8") as f:
         d = int(math.log2(sv.dim))
         f.write(f"{d}\n")
@@ -24,7 +25,9 @@ def save_to_file(path: str, sv: Statevector, eps=1.0e-10):
                 key = bin((1<<d) + i)[-d:]
                 f.write(f"{key},{z.real},{z.imag}\n")
             elif math.isnan(z.real):
-                raise ValueError("NaN detected in state vector for entry " + str(i))
+                nan_was_detected = True
+    if nan_was_detected:
+        raise ValueError("NaN detected in : " + path)
 
 def read_from_file(path: str) -> Statevector:
     """ Read a statevector from a file created by save_to_file.
