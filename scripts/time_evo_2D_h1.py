@@ -74,7 +74,7 @@ class Parameters:
             self.dim, self.n1, self.L, self.eta, self.Ln, self.Ls
         )
 
-        self.delta_t = 0.001  # a.u.
+        self.delta_t = 0.01  # a.u.
         self.disc_spec = DiscretizationSpec(self.delta_t)
         self.asy_spec = AntisymmetrizationSpec(self.wfr_spec, self.antisym_method)
         self.nuclei_data = [
