@@ -58,7 +58,9 @@ class RadialFuncQrom(Frame):
                 if j <= i and i < HM + 1:
                     x = i * self._dq
                     r = math.sqrt(x*x + y*y)
-                    psi = self._rfunc(r + self._dq/2)
+                    if r == 0:
+                        r = self._dq / 2 # avoid division by zero
+                    psi = self._rfunc(r)
                     if abs(psi) > math.pi:
                         logger.warning("x=%f, y=%f, r=%f, psi=%f", x, y, r, psi) 
                     self._data[i, j] = psi

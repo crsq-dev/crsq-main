@@ -17,9 +17,10 @@ class PsiH2D:
             n: int : primary quantum number
             m: int : secondary quantum number
     """
-    def __init__(self, Qx0: float, Qy0: float, n: int, m: int):
+    def __init__(self, Qx0: float, Qy0: float, dq: float, n: int, m: int):
         self._Qx0 = Qx0
         self._Qy0 = Qy0
+        self._dq = dq
         if abs(m) > n:
             raise ValueError(f"Invalid quantum numbers: n={n}, m={m}. must be |m| <= n")
         self._n = n
@@ -41,6 +42,7 @@ class PsiH2D:
         dxv = qxv - (self._Qx0)
         dyv = qyv - (self._Qy0)
         rho = np.sqrt(np.square(dxv) + np.square(dyv))
+        rho[0,0] = self._dq / 2
         A = math.sqrt((q0**3 * math.factorial(n-absm))/(math.pi*math.factorial(n+absm)))
         q0rho = q0*rho
         q0rho2 = 2*q0rho

@@ -41,12 +41,13 @@ def elec_elec_potential(r: float) -> float:
 class Parameters:
     def __init__(
         self,
-        outdir="output/default",
-        device="GPU",
-        enable_cuStateVec=True,
-        dim=2,
-        qn = 0,
-        qm = 0,
+        outdir,
+        device,
+        enable_cuStateVec,
+        dim,
+        qn,
+        qm,
+        delta_t,
         precision="single",
         n1=5,
         num_nucl_iters=1,
@@ -74,7 +75,7 @@ class Parameters:
             self.dim, self.n1, self.L, self.eta, self.Ln, self.Ls
         )
 
-        self.delta_t = 0.01  # a.u.
+        self.delta_t = delta_t
         self.disc_spec = DiscretizationSpec(self.delta_t)
         self.asy_spec = AntisymmetrizationSpec(self.wfr_spec, self.antisym_method)
         self.nuclei_data = [
@@ -108,7 +109,7 @@ class Parameters:
         qn = self.qn
         qm = self.qm
         delta_q = self.dq / 2
-        psifunc2d = PsiH2D(self.x0 + delta_q, self.y0 + delta_q, qn, qm)
+        psifunc2d = PsiH2D(self.x0, self.y0, delta_q, qn, qm)
         psixy = psifunc2d(self.xv, self.yv)
         ini_electrons = [psixy]
         ini_configs = [ini_electrons]
@@ -290,8 +291,9 @@ if __name__ == "__main__":
     dim = 2
     qn = args.qnum_n
     qm = args.qnum_m
+    delta_t = 0.1
 
-    tag = f"{args.device}_{use_cuStateVec}_{dim}D_n{qn}_m{qm}_{args.precision}_{args.bits}b"
+    tag = f"{args.device}_{use_cuStateVec}_{args.bits}b_{args.precision}_{dim}D_n{qn}_m{qm}_dt{delta_t:4.3f}"
 
     outdir = "output/" + tag
     os.makedirs(outdir, exist_ok=True)
@@ -324,6 +326,7 @@ if __name__ == "__main__":
         dim,
         args.qnum_n,
         args.qnum_m,
+        delta_t,
         args.precision,
         args.bits,
         args.num_nucl_iters,
