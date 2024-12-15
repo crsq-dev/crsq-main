@@ -25,11 +25,12 @@ class RadialFuncQrom(Frame):
         n: bits per dimension
         rfunc: function of the form rfunc(r: float) -> float
     """
-    def __init__(self, n: int, dq: float, rfunc: callable, build = True, verbose=False):
+    def __init__(self, n: int, dq: float, rfunc: callable, use_symmetry=True, build = True, verbose=False):
         super().__init__(label="RadialFuncQROM")
         logger.info("start: RadialFuncQrom()")
         t1 = time.time()
         self._n = n
+        self._use_symmetry = use_symmetry
         self._verbose = verbose
         self._dq = dq  # grid spacing
         self._rfunc = rfunc
@@ -43,6 +44,35 @@ class RadialFuncQrom(Frame):
             logger.info("end  : RadialFuncQrom() %f msec", round(dt*1000))
     
     def _prepare_data(self):
+        if self._use_symmetry:
+            self._prepare_data_symmetry()
+        else:
+            self._prepare_data_full()
+    
+    def _prepare_data_full(self):
+        n = self._n
+        M = 2**n
+        self._data = np.ndarray((M, M), dtype=float)
+        self._has_data_y = np.ndarray((n, M, M), dtype=int)
+        self._has_data_x = np.ndarray((n, M, M), dtype=int)
+        for j in range(M):
+            sj = (j+M//2) % M - (M//2)
+            y = sj * self._dq
+            for i in range(M):
+                si = (i+M//2) % M - (M//2)
+                x = si * self._dq
+                r = math.sqrt(x*x + y*y)
+                if r == 0:
+                    r = self._dq / 2
+                psi = self._rfunc(r)
+                if abs(psi) > math.pi:
+                    logger.warning("x=%f, y=%f, r=%f, psi=%f", x, y, r, psi)
+                self._data[i, j] = psi
+                self._has_data_y[0, i, j] = psi != 0.0
+        self._make_has_data_tables()
+
+
+    def _prepare_data_symmetry(self):
         # for a n bit x, abs(x) results as values 0 to 2^(n-1)
         # The values required is for 0 to 2^(n-1), which is 2^(n-1)+1 values.
         # We prepare a table sized 2^n, and use the range [0,0] to [2^(n-1), 2^(n-1)].
@@ -67,6 +97,11 @@ class RadialFuncQrom(Frame):
                     self._has_data_y[0, i, j] = psi != 0.0
                 else:
                     self._has_data_y[0, i, j] = 0
+        self._make_has_data_tables()
+    
+    def _make_has_data_tables(self):
+        n = self._n
+        M = 2**n
         w = M
         for k in range(0, n-1):
             for j in range(0, w//2):
@@ -83,6 +118,7 @@ class RadialFuncQrom(Frame):
         w = M
         if self._verbose:
             self._print_tables()
+    
 
     def _print_tables(self):
         n = self._n
@@ -108,23 +144,26 @@ class RadialFuncQrom(Frame):
         # work for qrom
         self._wx = QuantumRegister(n, "wx")
         self._wy = QuantumRegister(n, "wy")
+        self.add_local(self._wx, self._wy)
 
-        # sign
-        self._sx = QuantumRegister(1, "sx")
-        self._sy = QuantumRegister(1, "sy")
-        # compare result
-        self._cz = QuantumRegister(1, "cz")
-        # carry for abs
-        self._cr = QuantumRegister(n-1, "cr")
-
-        self.add_local(self._wx, self._wy, self._sx, self._sy, self._cz, self._cr)
-
-        regs = []
+        qubits = []
         for i in range(n-1, -1, -1):
-            regs += [self._x[i], self._wx[i], self._y[i], self._wy[i]]
-        regs += [self._sx[0], self._sy[0], self._cz[0]] + self._cr[:]
-        reg_index = [self.circuit.qubits.index(reg) for reg in regs]
-        self._regs = reg_index
+            qubits += [self._x[i], self._wx[i], self._y[i], self._wy[i]]
+
+        if self._use_symmetry:
+            # sign
+            self._sx = QuantumRegister(1, "sx")
+            self._sy = QuantumRegister(1, "sy")
+            # compare result
+            self._cz = QuantumRegister(1, "cz")
+            # carry for abs
+            self._cr = QuantumRegister(n-1, "cr")
+
+            self.add_local(self._sx, self._sy, self._cz, self._cr)
+            qubits += [self._sx[0], self._sy[0], self._cz[0]] + self._cr[:]
+
+        bit_index = [self.circuit.qubits.index(qubit) for qubit in qubits]
+        self._regs = bit_index
     
     @property
     def regs(self):
@@ -134,33 +173,36 @@ class RadialFuncQrom(Frame):
         """ build """
         qc = self.circuit
         n = self._n
-        qc.append(ari.absolute_gate(n), self._x[:] + self._sx[:] + self._cr[:])
-        qc.append(ari.absolute_gate(n), self._y[:] + self._sy[:] + self._cr[:])
-        qc.append(ari.cdk_comparator_gate(n), self._y[:] + self._x[:] + self._cz[:] + self._cr[0:1])
-        for i in range(n):
-            qc.cswap(self._cz[0], self._x[i], self._y[i])
-        qc.barrier()
+ 
+        if self._use_symmetry:
+            qc.append(ari.absolute_gate(n), self._x[:] + self._sx[:] + self._cr[:])
+            qc.append(ari.absolute_gate(n), self._y[:] + self._sy[:] + self._cr[:])
+            qc.append(ari.cdk_comparator_gate(n), self._y[:] + self._x[:] + self._cz[:] + self._cr[0:1])
+            for i in range(n):
+                qc.cswap(self._cz[0], self._x[i], self._y[i])
+            qc.barrier()
 
         xi = 0
         yi = 0
         k = n - 1
         self._build_area(xi, yi, k, None, None)
 
-        qc.barrier()
-        for i in range(n-1,-1,-1):
-            qc.cswap(self._cz[0], self._x[i], self._y[i])
+        if self._use_symmetry:
+            qc.barrier()
+            for i in range(n-1,-1,-1):
+                qc.cswap(self._cz[0], self._x[i], self._y[i])
 
-        cmp_dag_gate = ari.cdk_comparator_gate(n).inverse()
-        cmp_dag_gate.label = f"cmp\u2020({n})"
-        qc.append(cmp_dag_gate, self._y[:] + self._x[:] + self._cz[:] + self._cr[0:1])
+            cmp_dag_gate = ari.cdk_comparator_gate(n).inverse()
+            cmp_dag_gate.label = f"cmp\u2020({n})"
+            qc.append(cmp_dag_gate, self._y[:] + self._x[:] + self._cz[:] + self._cr[0:1])
 
-        absy_dag_gate = ari.absolute_gate(n).inverse()
-        absy_dag_gate.label = f"abs\u2020({n})"
-        qc.append(absy_dag_gate, self._y[:] + self._sy[:] + self._cr[:])
+            absy_dag_gate = ari.absolute_gate(n).inverse()
+            absy_dag_gate.label = f"abs\u2020({n})"
+            qc.append(absy_dag_gate, self._y[:] + self._sy[:] + self._cr[:])
 
-        absx_dag_gate = ari.absolute_gate(n).inverse()
-        absx_dag_gate.label = f"abs\u2020({n})"
-        qc.append(absx_dag_gate, self._x[:] + self._sx[:] + self._cr[:])
+            absx_dag_gate = ari.absolute_gate(n).inverse()
+            absx_dag_gate.label = f"abs\u2020({n})"
+            qc.append(absx_dag_gate, self._x[:] + self._sx[:] + self._cr[:])
 
     def _build_area(self, xi, yi, k, wxk:QuantumRegister, wyk:QuantumRegister):
 
@@ -329,11 +371,12 @@ class RadialFuncQrom(Frame):
 
 
 class RadialFuncQromTestBoard(Frame):
-    def __init__(self, n: int, dq: float, rfunc: callable, verbose=True):
+    def __init__(self, n: int, dq: float, rfunc: callable, use_symmetry=True, verbose=True):
         super().__init__(label="RFQTest")
         self._n = n
         self._dq = dq
         self._rfunc = rfunc
+        self._use_symmetry = use_symmetry
         self._verbose = verbose
         self.allocate_registers()
         self.build_circuit()
@@ -347,7 +390,7 @@ class RadialFuncQromTestBoard(Frame):
         qc = self.circuit
         qc.h(self._x)
         qc.h(self._y)
-        self._rfq = RadialFuncQrom(self._n, self._dq, self._rfunc, verbose=self._verbose)
+        self._rfq = RadialFuncQrom(self._n, self._dq, self._rfunc, self._use_symmetry, verbose=self._verbose)
         self.invoke(self._rfq.bind(x=self._x, y=self._y))
 
     @property

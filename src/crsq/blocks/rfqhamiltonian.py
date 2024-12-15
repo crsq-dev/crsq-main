@@ -45,12 +45,14 @@ class RfqPotentialSpec:
         wfr_spec: wave_function.WaveFunctionRegisterSpec,
         elec_elec_potential_func: Callable[[float], float],
         elec_nucl_potential_func: Callable[[float], float],
+        use_symmetry: bool = True,
         save_state_vector_per_qrom: bool = False
     ):
         assert isinstance(wfr_spec, wave_function.WaveFunctionRegisterSpec)
         self._wfr_spec = wfr_spec
         self._elec_elec_potential_func = elec_elec_potential_func
         self._elec_nucl_potential_func = elec_nucl_potential_func
+        self._use_symmetry = use_symmetry
         self._should_save_state_vector_per_qrom = save_state_vector_per_qrom
 
     @property
@@ -129,6 +131,7 @@ class RfqElectronPotentialBlock(heap.Frame):
                     wfr_spec.num_coordinate_bits,
                     wfr_spec.delta_q,
                     self._elec_elec_phase_shift,
+                    use_symmetry=rfq_spec._use_symmetry
                 )
                 self.invoke(rfq.bind(x=x1r.register, y=y1r.register), invoke_as_instruction=True)
 
@@ -166,7 +169,8 @@ class RfqElectronPotentialBlock(heap.Frame):
                 rfq = radial_func_qrom.RadialFuncQrom(
                     wfr_spec.num_coordinate_bits,
                     wfr_spec.delta_q,
-                    self._elec_nucl_phase_shift
+                    self._elec_nucl_phase_shift,
+                    use_symmetry=rfq_spec._use_symmetry
                 )
                 self.invoke(rfq.bind(x=exr.register, y=eyr.register), invoke_as_instruction=True)
 
