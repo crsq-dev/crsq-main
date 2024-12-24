@@ -70,7 +70,7 @@ class Parameters:
         self.Ls = 1  # stationary nucleus
         self.num_nucl_iters = num_nucl_iters
         self.num_elec_iters = num_elec_iters
-        self.use_symmetry = False
+        self.use_symmetry = True
         self.antisym_method = 3  # binary coded antisymmetrization method
         self.wfr_spec = WaveFunctionRegisterSpec(
             self.dim, self.n1, self.L, self.eta, self.Ln, self.Ls
@@ -162,7 +162,8 @@ class Parameters:
             cuStateVec_enable=self.enable_cuStateVec,
             precision=self.precision,
         )
-        backend.set_options(max_parallel_threads=0)
+        num_threads = 1
+        backend.set_options(max_parallel_threads=num_threads)
 
         self.rfq_spec = RfqPotentialSpec(
             self.wfr_spec,
@@ -294,7 +295,7 @@ if __name__ == "__main__":
     dim = 2
     qn = args.qnum_n
     qm = args.qnum_m
-    delta_t = 0.1
+    delta_t = 0.01
 
     tag = f"{args.device}_{use_cuStateVec}_{args.bits}b_{args.precision}_{dim}D_n{qn}_m{qm}_dt{delta_t:4.3f}"
 

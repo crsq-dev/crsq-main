@@ -39,10 +39,10 @@ class PsiH2D:
         m = self._m
         absm = abs(m)
         q0 = 1/(n+1/2)
-        dxv = qxv - (self._Qx0)
-        dyv = qyv - (self._Qy0)
+        dxv = qxv - (self._Qx0 + self._dq / 2)
+        dyv = qyv - (self._Qy0 + self._dq / 2)
         rho = np.sqrt(np.square(dxv) + np.square(dyv))
-        rho[0,0] = self._dq / 2
+        # rho[0,0] = self._dq / 2
         A = math.sqrt((q0**3 * math.factorial(n-absm))/(math.pi*math.factorial(n+absm)))
         q0rho = q0*rho
         q0rho2 = 2*q0rho

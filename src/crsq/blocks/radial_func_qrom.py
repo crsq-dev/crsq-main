@@ -23,14 +23,18 @@ class RadialFuncQrom(Frame):
 
     Args:
         n: bits per dimension
+        dq: grid spacing
         rfunc: function of the form rfunc(r: float) -> float
+        use_symmetry: use x-axis or y-axis symmetry of the function f(x,y) = f(-x,y) , f(x,y) = f(x, -y)
+        use_transpose: use transpositional symmetry of the function f(x,y) = f(y,x)
     """
-    def __init__(self, n: int, dq: float, rfunc: callable, use_symmetry=True, build = True, verbose=False):
+    def __init__(self, n: int, dq: float, rfunc: callable, use_symmetry=True, use_transpose=True, build = True, verbose=False):
         super().__init__(label="RadialFuncQROM")
         logger.info("start: RadialFuncQrom()")
         t1 = time.time()
         self._n = n
         self._use_symmetry = use_symmetry
+        self._use_transpose = use_transpose
         self._verbose = verbose
         self._dq = dq  # grid spacing
         self._rfunc = rfunc
@@ -45,11 +49,14 @@ class RadialFuncQrom(Frame):
     
     def _prepare_data(self):
         if self._use_symmetry:
-            self._prepare_data_symmetry()
+            if self._use_transpose:
+                self._prepare_data_cond(lambda si, sj: si >= 0 and sj >= 0 and si <= sj)
+            else:
+                self._prepare_data_cond(lambda si, sj: si >= 0 and sj >= 0)
         else:
-            self._prepare_data_full()
+            self._prepare_data_cond(lambda si, sj: True)
     
-    def _prepare_data_full(self):
+    def _prepare_data_cond(self, condition_func):
         n = self._n
         M = 2**n
         self._data = np.ndarray((M, M), dtype=float)
@@ -57,10 +64,36 @@ class RadialFuncQrom(Frame):
         self._has_data_x = np.ndarray((n, M, M), dtype=int)
         for j in range(M):
             sj = (j+M//2) % M - (M//2)
-            y = sj * self._dq
+            y = (sj + 0.5) * self._dq
             for i in range(M):
                 si = (i+M//2) % M - (M//2)
-                x = si * self._dq
+                if condition_func(si, sj):
+                    x = (si + 0.5) * self._dq
+                    r = math.sqrt(x*x + y*y)
+                    if r == 0:
+                        r = self._dq / 2
+                    psi = self._rfunc(r)
+                    if abs(psi) > math.pi:
+                        logger.warning("x=%f, y=%f, r=%f, psi=%f", x, y, r, psi)
+                    self._data[i, j] = psi
+                    self._has_data_y[0, i, j] = psi != 0.0
+                else:
+                    self._has_data_y[0, i, j] = 0
+        self._make_has_data_tables()
+    
+    def _prepare_data_full(self):
+        """ deprecated """
+        n = self._n
+        M = 2**n
+        self._data = np.ndarray((M, M), dtype=float)
+        self._has_data_y = np.ndarray((n, M, M), dtype=int)
+        self._has_data_x = np.ndarray((n, M, M), dtype=int)
+        for j in range(M):
+            sj = (j+M//2) % M - (M//2)
+            y = (sj + 0.5) * self._dq
+            for i in range(M):
+                si = (i+M//2) % M - (M//2)
+                x = (si + 0.5) * self._dq
                 r = math.sqrt(x*x + y*y)
                 if r == 0:
                     r = self._dq / 2
@@ -73,9 +106,11 @@ class RadialFuncQrom(Frame):
 
 
     def _prepare_data_symmetry(self):
-        # for a n bit x, abs(x) results as values 0 to 2^(n-1)
-        # The values required is for 0 to 2^(n-1), which is 2^(n-1)+1 values.
-        # We prepare a table sized 2^n, and use the range [0,0] to [2^(n-1), 2^(n-1)].
+        """ deprecated 
+            for a n bit x, abs(x) results as values 0 to 2^(n-1)
+            The values required is for 0 to 2^(n-1), which is 2^(n-1)+1 values.
+            We prepare a table sized 2^n, and use the range [0,0] to [2^(n-1), 2^(n-1)].
+        """
         n = self._n
         M = 2**n
         HM = M //2
