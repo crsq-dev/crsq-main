@@ -70,7 +70,9 @@ class Parameters:
         self.Ls = 1  # stationary nucleus
         self.num_nucl_iters = num_nucl_iters
         self.num_elec_iters = num_elec_iters
+        # QROM optimization switches
         self.use_symmetry = True
+        self.use_transpose = False
         self.antisym_method = 3  # binary coded antisymmetrization method
         self.wfr_spec = WaveFunctionRegisterSpec(
             self.dim, self.n1, self.L, self.eta, self.Ln, self.Ls
@@ -129,6 +131,7 @@ class Parameters:
             elec_elec_potential,
             elec_proton_potential,
             use_symmetry=self.use_symmetry,
+            use_transpose=self.use_transpose,
             save_state_vector_per_qrom=False)
 
 
