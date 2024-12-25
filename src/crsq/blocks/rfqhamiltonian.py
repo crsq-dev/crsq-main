@@ -46,6 +46,7 @@ class RfqPotentialSpec:
         elec_elec_potential_func: Callable[[float], float],
         elec_nucl_potential_func: Callable[[float], float],
         use_symmetry: bool = True,
+        use_transpose: bool = True,
         save_state_vector_per_qrom: bool = False
     ):
         assert isinstance(wfr_spec, wave_function.WaveFunctionRegisterSpec)
@@ -53,6 +54,7 @@ class RfqPotentialSpec:
         self._elec_elec_potential_func = elec_elec_potential_func
         self._elec_nucl_potential_func = elec_nucl_potential_func
         self._use_symmetry = use_symmetry
+        self._use_transpose = use_transpose
         self._should_save_state_vector_per_qrom = save_state_vector_per_qrom
 
     @property
@@ -70,6 +72,14 @@ class RfqPotentialSpec:
     @property
     def should_save_state_vector_per_qrom(self) -> bool:
         return self._should_save_state_vector_per_qrom
+
+    @property
+    def should_use_symmetry(self) -> bool:
+        return self._use_symmetry
+
+    @property
+    def should_use_transpose(self) -> bool:
+        return self._use_transpose
 
 class RfqElectronPotentialBlock(heap.Frame):
     def __init__(
@@ -131,7 +141,8 @@ class RfqElectronPotentialBlock(heap.Frame):
                     wfr_spec.num_coordinate_bits,
                     wfr_spec.delta_q,
                     self._elec_elec_phase_shift,
-                    use_symmetry=rfq_spec._use_symmetry
+                    use_symmetry=rfq_spec.should_use_symmetry,
+                    use_transpose=rfq_spec.should_use_transpose
                 )
                 self.invoke(rfq.bind(x=x1r.register, y=y1r.register), invoke_as_instruction=True)
 
