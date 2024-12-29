@@ -46,6 +46,9 @@ class RadialFuncQrom(Frame):
         self._n = n
         self._use_symmetry = use_symmetry
         self._use_transpose = use_transpose
+        if use_transpose and not use_symmetry:
+            raise ValueError("use_transpose requires use_symmetry")
+        logger.info("use_symmetry: %s, use_transpose: %s", use_symmetry, use_transpose)
         self._verbose = verbose
         self._dq = dq  # grid spacing
         self._rfunc = rfunc

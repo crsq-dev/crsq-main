@@ -56,6 +56,8 @@ class RfqPotentialSpec:
         self._use_symmetry = use_symmetry
         self._use_transpose = use_transpose
         self._should_save_state_vector_per_qrom = save_state_vector_per_qrom
+        logger.info("RfqPotentialSpec: use_symmetry=%s, use_transpose=%s, save_state_vector_per_qrom=%s",
+                    use_symmetry, use_transpose, save_state_vector_per_qrom)
 
     @property
     def wfr_spec(self):
@@ -181,7 +183,8 @@ class RfqElectronPotentialBlock(heap.Frame):
                     wfr_spec.num_coordinate_bits,
                     wfr_spec.delta_q,
                     self._elec_nucl_phase_shift,
-                    use_symmetry=rfq_spec._use_symmetry
+                    use_symmetry=rfq_spec._use_symmetry,
+                    use_transpose=rfq_spec._use_transpose
                 )
                 self.invoke(rfq.bind(x=exr.register, y=eyr.register), invoke_as_instruction=True)
 

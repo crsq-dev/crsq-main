@@ -126,6 +126,7 @@ class Parameters:
         # psix = np.zeros(M)
         # psiy = np.zeros(M)
 
+        logger.info("use_symmetry: %s , use_transpose: %s", self.use_symmetry, self.use_transpose)
         self.rfq_spec = RfqPotentialSpec(
             self.wfr_spec,
             elec_elec_potential,
@@ -173,6 +174,7 @@ class Parameters:
             elec_elec_potential,
             elec_proton_potential,
             use_symmetry=self.use_symmetry,
+            use_transpose=self.use_transpose,
             save_state_vector_per_qrom=False)
 
         self.evo_spec = TimeEvolutionSpec(
