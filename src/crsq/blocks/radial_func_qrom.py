@@ -64,7 +64,7 @@ class RadialFuncQrom(Frame):
         HM = M // 2
         if self._use_symmetry:
             if self._use_transpose:
-                self._prepare_data_cond(lambda i, j: i <= HM and j <= i)
+                self._prepare_data_cond(lambda i, j: j <= HM and i <= j)
             else:
                 self._prepare_data_cond(lambda i, j: i <= HM and j <= HM)
         else:
@@ -76,68 +76,16 @@ class RadialFuncQrom(Frame):
         self._data = np.ndarray((M, M), dtype=float)
         self._has_data_y = np.ndarray((n, M, M), dtype=int)
         self._has_data_x = np.ndarray((n, M, M), dtype=int)
-        for j in range(M):
-            sj = (j + M // 2) % M - (M // 2)
-            y = (sj + 0.5) * self._dq
-            for i in range(M):
+        for i in range(M):
+            si = (i + M // 2) % M - (M // 2)
+            y = si * self._dq
+            for j in range(M):
                 if condition_func(i, j):
-                    si = (i + M // 2) % M - (M // 2)
-                    x = (si + 0.5) * self._dq
+                    sj = (j + M // 2) % M - (M // 2)
+                    x = sj * self._dq
                     r = math.sqrt(x * x + y * y)
                     if r == 0:
                         r = self._dq / 2
-                    psi = self._rfunc(r)
-                    if abs(psi) > math.pi:
-                        logger.warning("x=%f, y=%f, r=%f, psi=%f", x, y, r, psi)
-                    self._data[i, j] = psi
-                    self._has_data_y[0, i, j] = psi != 0.0
-                else:
-                    self._has_data_y[0, i, j] = 0
-        self._make_has_data_tables()
-
-    def _prepare_data_full(self):
-        """deprecated"""
-        n = self._n
-        M = 2**n
-        self._data = np.ndarray((M, M), dtype=float)
-        self._has_data_y = np.ndarray((n, M, M), dtype=int)
-        self._has_data_x = np.ndarray((n, M, M), dtype=int)
-        for j in range(M):
-            sj = (j + M // 2) % M - (M // 2)
-            y = (sj + 0.5) * self._dq
-            for i in range(M):
-                si = (i + M // 2) % M - (M // 2)
-                x = (si + 0.5) * self._dq
-                r = math.sqrt(x * x + y * y)
-                if r == 0:
-                    r = self._dq / 2
-                psi = self._rfunc(r)
-                if abs(psi) > math.pi:
-                    logger.warning("x=%f, y=%f, r=%f, psi=%f", x, y, r, psi)
-                self._data[i, j] = psi
-                self._has_data_y[0, i, j] = psi != 0.0
-        self._make_has_data_tables()
-
-    def _prepare_data_symmetry(self):
-        """deprecated
-        for a n bit x, abs(x) results as values 0 to 2^(n-1)
-        The values required is for 0 to 2^(n-1), which is 2^(n-1)+1 values.
-        We prepare a table sized 2^n, and use the range [0,0] to [2^(n-1), 2^(n-1)].
-        """
-        n = self._n
-        M = 2**n
-        HM = M // 2
-        self._data = np.ndarray((M, M), dtype=float)
-        self._has_data_y = np.ndarray((n, M, M), dtype=int)
-        self._has_data_x = np.ndarray((n, M, M), dtype=int)
-        for j in range(M):
-            y = j * self._dq
-            for i in range(M):
-                if j <= i and i < HM + 1:
-                    x = i * self._dq
-                    r = math.sqrt(x * x + y * y)
-                    if r == 0:
-                        r = self._dq / 2  # avoid division by zero
                     psi = self._rfunc(r)
                     if abs(psi) > math.pi:
                         logger.warning("x=%f, y=%f, r=%f, psi=%f", x, y, r, psi)
@@ -151,27 +99,28 @@ class RadialFuncQrom(Frame):
         n = self._n
         M = 2**n
         w = M
+        hw = w // 2
         for k in range(0, n - 1):
-            for j in range(0, w // 2):
-                for i in range(0, w):
+            for i in range(0, hw):
+                for j in range(0, w):
                     self._has_data_x[k, i, j] = (
-                        self._has_data_y[k, i, 2 * j]
-                        or self._has_data_y[k, i, 2 * j + 1]
+                        self._has_data_y[k, 2 * i, j]
+                        or self._has_data_y[k, 2 * i + 1, j]
                     )
-            for j in range(0, w // 2):
-                for i in range(0, w // 2):
+            for i in range(0, hw):
+                for j in range(0, hw):
                     self._has_data_y[k + 1, i, j] = (
-                        self._has_data_x[k, 2 * i, j]
-                        or self._has_data_x[k, 2 * i + 1, j]
+                        self._has_data_x[k, i, 2 * j]
+                        or self._has_data_x[k, i, 2 * j + 1]
                     )
-            w = w // 2
+            w = hw
+            hw = w // 2
         k = n - 1
-        for j in range(0, w // 2):
+        for j in range(0, hw):
             for i in range(0, w):
                 self._has_data_x[k, i, j] = (
-                    self._has_data_y[k, i, 2 * j] or self._has_data_y[k, i, 2 * j + 1]
+                    self._has_data_y[k, 2 * i, j] or self._has_data_y[k, 2 * i + 1, j]
                 )
-        w = M
         if self._verbose:
             self._print_tables()
 
@@ -179,14 +128,16 @@ class RadialFuncQrom(Frame):
         n = self._n
         M = 2**n
         w = M
+        hw = w // 2
         for k in range(n):
             print(f"has_data_y[{k}]")
             for j in range(w):
                 print(self._has_data_y[k, :w, j])
             print(f"has_data_x[{k}]")
-            for j in range(w // 2):
+            for j in range(hw):
                 print(self._has_data_x[k, :w, j])
-            w = w // 2
+            w = hw
+            hw = w // 2
 
     def allocate_registers(self):
         """allocate"""
@@ -208,13 +159,17 @@ class RadialFuncQrom(Frame):
             # sign
             self._sx = QuantumRegister(1, "sx")
             self._sy = QuantumRegister(1, "sy")
-            # compare result
-            self._cz = QuantumRegister(1, "cz")
             # carry for abs
             self._cr = QuantumRegister(n - 1, "cr")
 
-            self.add_local(self._sx, self._sy, self._cz, self._cr)
-            qubits += [self._sx[0], self._sy[0], self._cz[0]] + self._cr[:]
+            self.add_local(self._sx, self._sy, self._cr)
+            qubits += self._sx[:] + self._sy[:] + self._cr[:]
+
+            if self._use_transpose:
+                # compare result
+                self._cz = QuantumRegister(1, "cz")
+                self.add_local(self._cz)
+                qubits += self._cz[:]
 
         bit_index = [self.circuit.qubits.index(qubit) for qubit in qubits]
         self._regs = bit_index
@@ -276,8 +231,8 @@ class RadialFuncQrom(Frame):
         # For cases where both halves are empty, this function will
         # not be called.
 
-        if self._has_data_x[k, xi * 2, yi]:
-            if self._has_data_x[k, xi * 2 + 1, yi]:
+        if self._has_data_x[k, yi, xi * 2]:
+            if self._has_data_x[k, yi, xi * 2 + 1]:
                 # both x low and x high have data
                 # focus on lower half.
                 if k == n - 1:
@@ -317,7 +272,7 @@ class RadialFuncQrom(Frame):
                 else:
                     pass
         else:
-            if self._has_data_x[k, xi * 2 + 1, yi]:
+            if self._has_data_x[k, yi, xi * 2 + 1]:
                 # only x high has data.
                 # set focus.
                 if k == n - 1:
@@ -340,8 +295,8 @@ class RadialFuncQrom(Frame):
     def _build_area_x_low(self, xi, yi, k, wxk: QuantumRegister, wyk: QuantumRegister):
         qc = self.circuit
         if k > 0:
-            if self._has_data_y[k, xi * 2, yi * 2]:
-                if self._has_data_y[k, xi * 2, yi * 2 + 1]:
+            if self._has_data_y[k, yi * 2, xi * 2]:
+                if self._has_data_y[k, yi * 2 + 1, xi * 2]:
                     # both y low and y high have data
                     qc.ccx(wxk, self._y[k], self._wy[k], ctrl_state="01")
                     wyk = self._wy[k]
@@ -354,7 +309,7 @@ class RadialFuncQrom(Frame):
                     wyk = wxk
                     self._build_area(xi * 2, yi * 2, k - 1, wxk, wyk)
             else:
-                if self._has_data_y[k, xi * 2, yi * 2 + 1]:
+                if self._has_data_y[k, yi * 2 + 1, xi * 2]:
                     # only y high has data
                     wyk = wxk
                     self._build_area(xi * 2, yi * 2 + 1, k - 1, wxk, wyk)
@@ -364,18 +319,17 @@ class RadialFuncQrom(Frame):
                     print("Error: no data for x low half")
         else:
             # later bit comes first
-            v = self._data[xi * 2, yi * 2 + 1]
+            v = self._data[yi * 2 + 1, xi * 2]
             if v != 0.0:
                 qc.cp(v, wxk, self._y[0])
 
             # earlier bit comes second
-            v = self._data[xi * 2, yi * 2]
+            v = self._data[yi * 2, xi * 2]
             # cancels with high half:
-            if self._has_data_x[k, xi * 2 + 1, yi]:
+            if self._has_data_x[k, yi * 2, xi * 2 + 1]:
                 qc.x(self._y[0])
                 if v != 0.0:
                     qc.cp(v, wxk, self._y[0])
-                    pass
             else:
                 if v != 0.0:
                     qc.x(self._y[0])
@@ -385,8 +339,8 @@ class RadialFuncQrom(Frame):
     def _build_area_x_high(self, xi, yi, k, wxk: QuantumRegister, wyk: QuantumRegister):
         qc = self.circuit
         if k > 0:
-            if self._has_data_y[k, xi * 2 + 1, yi * 2]:
-                if self._has_data_y[k, xi * 2 + 1, yi * 2 + 1]:
+            if self._has_data_y[k, yi * 2, xi * 2 + 1]:
+                if self._has_data_y[k, yi * 2 + 1, xi * 2 + 1]:
                     # both y low and y high have data
                     qc.ccx(wxk, self._y[k], self._wy[k], ctrl_state="01")
                     wyk = self._wy[k]
@@ -399,7 +353,7 @@ class RadialFuncQrom(Frame):
                     wyk = wxk
                     self._build_area(xi * 2 + 1, yi * 2, k - 1, wxk, wyk)
             else:
-                if self._has_data_y[k, xi * 2 + 1, yi * 2 + 1]:
+                if self._has_data_y[k, yi * 2 + 1, xi * 2 + 1]:
                     # only y high has data
                     wyk = wxk
                     self._build_area(xi * 2 + 1, yi * 2 + 1, k - 1, wxk, wyk)
@@ -408,12 +362,11 @@ class RadialFuncQrom(Frame):
                     # does not come here.
                     print("Error: no data for x high half")
         else:
-            v = self._data[xi * 2 + 1, yi * 2]
+            v = self._data[yi * 2, xi * 2 + 1]
             # cancels with low half
-            if self._has_data_x[k, xi * 2, yi]:
+            if self._has_data_x[k, yi * 2, xi * 2]:
                 if v != 0.0:
                     qc.cp(v, wxk, self._y[0])
-                    pass
                 qc.x(self._y[0])
             else:
                 if v != 0.0:
@@ -421,9 +374,9 @@ class RadialFuncQrom(Frame):
                     qc.cp(v, wxk, self._y[0])
                     qc.x(self._y[0])
 
-            v = self._data[xi * 2 + 1, yi * 2 + 1]
+            v = self._data[yi * 2 + 1, xi * 2 + 1]
             if v != 0.0:
-                qc.cp(v, self._wx[0], self._y[0])
+                qc.cp(v, wxk, self._y[0])
 
     def bind(self, x: QuantumRegister, y: QuantumRegister):
         return Binding(self, {"x": x, "y": y})

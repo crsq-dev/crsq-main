@@ -165,7 +165,7 @@ class Parameters:
             cuStateVec_enable=self.enable_cuStateVec,
             precision=self.precision,
         )
-        num_threads = 1
+        num_threads = 0
         backend.set_options(max_parallel_threads=num_threads)
 
         self.rfq_spec = RfqPotentialSpec(
