@@ -119,8 +119,8 @@ class RadialFuncQrom(Frame):
             w = hw
             hw = w // 2
         k = n - 1
-        for j in range(0, hw):
-            for i in range(0, w):
+        for i in range(0, hw):
+            for j in range(0, w):
                 self._has_data_x[k, i, j] = (
                     self._has_data_y[k, 2 * i, j] or self._has_data_y[k, 2 * i + 1, j]
                 )
@@ -134,11 +134,11 @@ class RadialFuncQrom(Frame):
         hw = w // 2
         for k in range(n):
             print(f"has_data_y[{k}]")
-            for j in range(w):
-                print(self._has_data_y[k, :w, j])
+            for i in range(w):
+                print(self._has_data_y[k, i, :w])
             print(f"has_data_x[{k}]")
-            for j in range(hw):
-                print(self._has_data_x[k, :w, j])
+            for i in range(hw):
+                print(self._has_data_x[k, i, :w])
             w = hw
             hw = w // 2
 
@@ -259,7 +259,7 @@ class RadialFuncQrom(Frame):
                 qc.x(self._wx[k])
                 wxk = self._wx[k]
                 # do the upper half
-                self._build_area_x(xi+1, yi, k, wxk, wyk)
+                self._build_area_y(xi+1, yi, k, wxk, wyk)
                 # reset focus
                 qc.x(self._wx[k])
             else:
@@ -298,7 +298,7 @@ class RadialFuncQrom(Frame):
                 # focus on lower half.
                 wxk = wyk
                 # do the lower half
-                self._build_area_x(xi, yi, k, wxk, wyk)
+                self._build_area_y(xi, yi, k, wxk, wyk)
                 # reset focus
         else:
             if self._has_data_x[k, yi, xi + 1]:
@@ -306,7 +306,7 @@ class RadialFuncQrom(Frame):
                 # set focus.
                 wxk = wyk
                 # do the upper half
-                self._build_area_x(xi + 1, yi, k, wxk, wyk)
+                self._build_area_y(xi + 1, yi, k, wxk, wyk)
                 # reset focus
             else:
                 # x low and x high both have no data.
