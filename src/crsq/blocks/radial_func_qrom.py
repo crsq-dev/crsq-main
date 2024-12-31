@@ -93,7 +93,7 @@ class RadialFuncQrom(Frame):
                     if abs(psi) > math.pi:
                         logger.warning("x=%f, y=%f, r=%f, psi=%f", x, y, r, psi)
                     self._data[i, j] = psi
-                    self._has_data_y[0, i, j] = psi != 0.0
+                    self._has_data_y[0, i, j] = 1
                 else:
                     self._has_data_y[0, i, j] = 0
         self._make_has_data_tables()
@@ -102,8 +102,8 @@ class RadialFuncQrom(Frame):
         n = self._n
         M = 2**n
         w = M
-        hw = w // 2
         for k in range(0, n - 1):
+            hw = w // 2
             for i in range(0, hw):
                 for j in range(0, w):
                     self._has_data_x[k, i, j] = (
@@ -117,7 +117,6 @@ class RadialFuncQrom(Frame):
                         or self._has_data_x[k, i, 2 * j + 1]
                     )
             w = hw
-            hw = w // 2
         k = n - 1
         for i in range(0, hw):
             for j in range(0, w):
