@@ -235,12 +235,12 @@ class RadialFuncQrom(Frame):
                 qc.cx(self._x[k], self._wx[k], ctrl_state="0")
                 wxk = self._wx[k]
                 # do the lower half
-                self._build_area_y(xi, yi, k, wxk, wyk)
+                self._build_area_y(xi, yi * 2, k, wxk, wyk)
                 # middle.
                 # switch focus to upper half
                 qc.x(self._wx[k])
                 # do the upper half
-                self._build_area_y(xi+1, yi, k, wxk, wyk)
+                self._build_area_y(xi + 1, yi * 2, k, wxk, wyk)
                 # reset focus
                 qc.cx(self._x[k], self._wx[k], ctrl_state="1")
             else:
@@ -249,7 +249,7 @@ class RadialFuncQrom(Frame):
                 qc.x(self._wx[k])
                 wxk = self._wx[k]
                 # do the lower half
-                self._build_area_y(xi, yi, k, wxk, wyk)
+                self._build_area_y(xi, yi * 2, k, wxk, wyk)
                 # reset focus
                 qc.x(self._wx[k])
         else:
@@ -259,7 +259,7 @@ class RadialFuncQrom(Frame):
                 qc.x(self._wx[k])
                 wxk = self._wx[k]
                 # do the upper half
-                self._build_area_y(xi+1, yi, k, wxk, wyk)
+                self._build_area_y(xi + 1, yi * 2, k, wxk, wyk)
                 # reset focus
                 qc.x(self._wx[k])
             else:
@@ -285,12 +285,12 @@ class RadialFuncQrom(Frame):
                 qc.ccx(wyk, self._x[k], self._wx[k], ctrl_state="01")
                 wxk = self._wx[k]
                 # do the lower half
-                self._build_area_y(xi, yi, k, wxk, wyk)
+                self._build_area_y(xi, yi * 2, k, wxk, wyk)
                 # middle.
                 # switch focus to upper half
                 qc.cx(wyk, self._wx[k])
                 # do the upper half
-                self._build_area_y(xi + 1, yi, k, wxk, wyk)
+                self._build_area_y(xi + 1, yi * 2, k, wxk, wyk)
                 # reset focus
                 qc.ccx(wyk, self._x[k], self._wx[k], ctrl_state="11")
             else:
@@ -298,7 +298,7 @@ class RadialFuncQrom(Frame):
                 # focus on lower half.
                 wxk = wyk
                 # do the lower half
-                self._build_area_y(xi, yi, k, wxk, wyk)
+                self._build_area_y(xi, yi * 2, k, wxk, wyk)
                 # reset focus
         else:
             if self._has_data_x[k, yi, xi + 1]:
@@ -306,7 +306,7 @@ class RadialFuncQrom(Frame):
                 # set focus.
                 wxk = wyk
                 # do the upper half
-                self._build_area_y(xi + 1, yi, k, wxk, wyk)
+                self._build_area_y(xi + 1, yi * 2, k, wxk, wyk)
                 # reset focus
             else:
                 # x low and x high both have no data.
@@ -318,7 +318,7 @@ class RadialFuncQrom(Frame):
         if k == 0:
             self._build_area_y_bottom(xi, yi, wxk, wyk)
             return
-        
+
         if self._has_data_y[k, yi, xi]:
             if self._has_data_y[k, yi + 1, xi]:
                 # both y low and y high have data
