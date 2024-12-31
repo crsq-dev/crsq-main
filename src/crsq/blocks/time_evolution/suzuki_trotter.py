@@ -128,9 +128,14 @@ class ElectronMotionBlock(heap.Frame):
         self.circuit.save_statevector(label=label)
 
     def _build_elec_potential_step_qrom(self):
-        block = self.build_elec_potential_block_qrom()
+        block: rfqhamiltonian.RfqElectronPotentialBlock = self.build_elec_potential_block_qrom()
         # we cannot save state vector at this point.
         logger.info("RfqElectronPotentialBlock[QROM].num_qubits = %d", block.circuit.num_qubits)
+        if self._rfq_spec.should_save_state_vector_per_qrom:
+            # pre-allocate the temporary qubits required by the qrom block.
+            t = self._temp_allocator.allocate(block._temp_allocator.size, "tmp")
+            self._temp_allocator.free(t)
+            self._save_state_vector_with_suffix("_qrom0")
         with check_time("RfqElectronPotentialBlock.invoke"):
             self.invoke(block.bind(eregs=self._e_index_regs, nregs=self._n_index_regs), invoke_as_instruction=True)
         if self._rfq_spec.should_save_state_vector_per_qrom:
@@ -350,6 +355,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         #     with qc.for_loop(range(n_elec_it)):
         for _atom_it in range(n_atom_it):
             for _elec_it in range(n_elec_it):
+                logger.info("before electron motion step. sim_time=%f", sim_time)
                 if evo_spec.should_calculate_electron_motion:
                     self._build_electron_motion_step(sim_time)
                 sim_time += delta_t
