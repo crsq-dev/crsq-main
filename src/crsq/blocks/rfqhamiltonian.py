@@ -12,7 +12,7 @@ from qiskit.circuit.library import XGate
 from crsq_heap import heap
 import crsq_arithmetic as ari
 from crsq_arithmetic import ast
-from crsq.blocks import wave_function, discretization, hamiltonian, radial_func_qrom
+from crsq.blocks import wave_function, discretization, hamiltonian, radial_func_qrom, radial_func_gray_code_qrom
 
 logger = logging.getLogger(__name__)
 LOG_TIME_THRESH = 1
@@ -47,6 +47,7 @@ class RfqPotentialSpec:
         elec_nucl_potential_func: Callable[[float], float],
         use_symmetry: bool = True,
         use_transpose: bool = True,
+        use_gray_code: bool = False,
         save_state_vector_per_qrom: bool = False
     ):
         assert isinstance(wfr_spec, wave_function.WaveFunctionRegisterSpec)
@@ -55,6 +56,7 @@ class RfqPotentialSpec:
         self._elec_nucl_potential_func = elec_nucl_potential_func
         self._use_symmetry = use_symmetry
         self._use_transpose = use_transpose
+        self._use_gray_code = use_gray_code
         self._should_save_state_vector_per_qrom = save_state_vector_per_qrom
         logger.info("RfqPotentialSpec: use_symmetry=%s, use_transpose=%s, save_state_vector_per_qrom=%s",
                     use_symmetry, use_transpose, save_state_vector_per_qrom)
@@ -82,6 +84,10 @@ class RfqPotentialSpec:
     @property
     def should_use_transpose(self) -> bool:
         return self._use_transpose
+    
+    @property
+    def should_use_gray_code(self) -> bool:
+        return self._use_gray_code
 
 class RfqElectronPotentialBlock(heap.Frame):
     def __init__(
@@ -110,6 +116,9 @@ class RfqElectronPotentialBlock(heap.Frame):
         self._eregs = self._wfr_spec.allocate_elec_registers()
         self._nregs = self._wfr_spec.allocate_nucl_registers()
         self.add_param(("eregs", self._eregs), ("nregs", self._nregs))
+        if self._rfq_spec.should_use_gray_code:
+            self._target = QuantumRegister(1, "target")
+            self.add_param(self._target)
 
     def build_circuits(self):
         self._build_elec_elec_potential_terms()
@@ -122,10 +131,29 @@ class RfqElectronPotentialBlock(heap.Frame):
     def _elec_nucl_phase_shift(self, r: float):
         """ -delta_t * Ven(r)"""
         return - self._disc_spec.delta_t * self._rfq_spec.elec_nucl_potential_func(r)
+    
+    def _apply_radial_func_qrom(self, xr: ast.Register, yr: ast.Register, rfunc):
+        wfr_spec = self._wfr_spec
+        rfq_spec = self._rfq_spec
+        if rfq_spec.should_use_gray_code:
+            rfgcq = radial_func_gray_code_qrom.RadialFuncGrayCodeQROM(
+                wfr_spec.num_coordinate_bits,
+                wfr_spec.delta_q,
+                rfunc
+            )
+            self.invoke(rfgcq.bind(x=xr.register, y=yr.register, target=self._target))
+        else:
+            rfq = radial_func_qrom.RadialFuncQrom(
+                wfr_spec.num_coordinate_bits,
+                wfr_spec.delta_q,
+                rfunc,
+                use_symmetry=rfq_spec.should_use_symmetry,
+                use_transpose=rfq_spec.should_use_transpose
+            )
+            self.invoke(rfq.bind(x=xr.register, y=yr.register), invoke_as_instruction=True)
 
     def _build_elec_elec_potential_terms(self):
         wfr_spec = self._wfr_spec
-        rfq_spec = self._rfq_spec
         for ie in range(wfr_spec.num_electrons):
             for ih in range(ie + 1, wfr_spec.num_electrons):
                 t1 = time.time()
@@ -139,14 +167,7 @@ class RfqElectronPotentialBlock(heap.Frame):
                 y1r -= y2r
                 scope.build_circuit()
 
-                rfq = radial_func_qrom.RadialFuncQrom(
-                    wfr_spec.num_coordinate_bits,
-                    wfr_spec.delta_q,
-                    self._elec_elec_phase_shift,
-                    use_symmetry=rfq_spec.should_use_symmetry,
-                    use_transpose=rfq_spec.should_use_transpose
-                )
-                self.invoke(rfq.bind(x=x1r.register, y=y1r.register), invoke_as_instruction=True)
+                self._apply_radial_func_qrom(x1r, y1r, self._elec_elec_phase_shift)
 
                 scope.build_inverse_circuit()
 
@@ -179,14 +200,7 @@ class RfqElectronPotentialBlock(heap.Frame):
                     eyr -= ayc
                 scope.build_circuit()
 
-                rfq = radial_func_qrom.RadialFuncQrom(
-                    wfr_spec.num_coordinate_bits,
-                    wfr_spec.delta_q,
-                    self._elec_nucl_phase_shift,
-                    use_symmetry=rfq_spec._use_symmetry,
-                    use_transpose=rfq_spec._use_transpose
-                )
-                self.invoke(rfq.bind(x=exr.register, y=eyr.register), invoke_as_instruction=True)
+                self._apply_radial_func_qrom(exr, eyr, self._elec_nucl_phase_shift)
 
                 scope.build_inverse_circuit()
 
@@ -196,5 +210,8 @@ class RfqElectronPotentialBlock(heap.Frame):
                 if dt > LOG_TIME_THRESH:
                     logger.info("  Ven(%d,%d) done. %d msec", ie, ia, round(dt * 1000))
     
-    def bind(self, eregs, nregs):
-        return heap.Binding(self, {"eregs": eregs, "nregs": nregs})
+    def bind(self, eregs, nregs, target:QuantumRegister = None):
+        if self._rfq_spec.should_use_gray_code:
+            return heap.Binding(self, {"eregs": eregs, "nregs": nregs, "target": target})
+        else:
+            return heap.Binding(self, {"eregs": eregs, "nregs": nregs})

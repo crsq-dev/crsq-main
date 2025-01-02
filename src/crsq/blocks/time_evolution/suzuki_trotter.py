@@ -70,6 +70,9 @@ class ElectronMotionBlock(heap.Frame):
         self._n_index_regs = wfr_spec.allocate_nucl_registers()
         self.add_param(("eregs", self._e_index_regs),
                        ("nregs", self._n_index_regs))
+        if self._rfq_spec.should_use_gray_code:
+            self._target = QuantumRegister(1, "target")
+            self.add_param(self._target)
 
     def build_circuit_on(self, other_frame: heap.Frame):
         """ Build the instructions on another compatible quantum circuit."""
@@ -137,7 +140,8 @@ class ElectronMotionBlock(heap.Frame):
             self._temp_allocator.free(t)
             self._save_state_vector_with_suffix("_qrom0")
         with check_time("RfqElectronPotentialBlock.invoke"):
-            self.invoke(block.bind(eregs=self._e_index_regs, nregs=self._n_index_regs), invoke_as_instruction=True)
+            self.invoke(block.bind(eregs=self._e_index_regs, nregs=self._n_index_regs,
+                                   target=self._target), invoke_as_instruction=True)
         if self._rfq_spec.should_save_state_vector_per_qrom:
             self._save_state_vector_with_suffix("_qrom1")
 
@@ -169,12 +173,20 @@ class ElectronMotionBlock(heap.Frame):
 
     def bind(self,
              eregs: List[List[QuantumRegister]],
-             nregs: List[List[QuantumRegister]]):
+             nregs: List[List[QuantumRegister]],
+             target: QuantumRegister = None):
         """ bind arguments to the function """
-        return heap.Binding(self, {
-            "eregs": eregs,
-            "nregs": nregs
-        })
+        if self._rfq_spec.should_use_gray_code:
+            return heap.Binding(self, {
+                "eregs": eregs,
+                "nregs": nregs,
+                "target": target
+            })
+        else:
+            return heap.Binding(self, {
+                "eregs": eregs,
+                "nregs": nregs
+            })
 
 
 class NucleusMotionBlock(heap.Frame):
@@ -300,6 +312,9 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         self._n_index_regs = wfr_spec.allocate_nucl_registers()
         self.add_param(("eregs", self._e_index_regs),
                        ("nregs", self._n_index_regs))
+        if self._evo_spec.rfq_spec.should_use_gray_code:
+            self._target = QuantumRegister(1, "target")
+            self.add_param(self._target)
         self._slater_ancilla = asy_spec.allocate_ancilla_register()
         self.add_param(self._slater_ancilla)
         self._slater_indices = asy_spec.allocate_sigma_regs()
@@ -419,7 +434,8 @@ class SuzukiTrotterMethodBlock(heap.Frame):
             with check_time("ElectronMotionBlock.invoke"):
                 self.invoke(elec_motion_block.bind(
                     eregs=self._e_index_regs,
-                    nregs=self._n_index_regs
+                    nregs=self._n_index_regs,
+                    target=self._target,
                 ), invoke_as_instruction=True)
             return
         logger.info("ElectronMotionBlock: using individual steps")
@@ -503,6 +519,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
     def bind(self,
              eregs: List[List[QuantumRegister]],
              nregs: List[List[QuantumRegister]],
+             target: QuantumRegister,
              slater_indices: List[QuantumRegister],
              slater_ancilla: QuantumRegister,
              p: QuantumRegister
@@ -516,4 +533,6 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         }
         if self._slater_ancilla is not None:
             arg_map[self._slater_ancilla.name] = slater_ancilla
+        if self._evo_spec.rfq_spec.should_use_gray_code:
+            arg_map[self._target.name] = target
         return heap.Binding(self, arg_map)

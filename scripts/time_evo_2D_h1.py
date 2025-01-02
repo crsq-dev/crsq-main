@@ -71,9 +71,10 @@ class Parameters:
         self.num_nucl_iters = num_nucl_iters
         self.num_elec_iters = num_elec_iters
         # QROM optimization switches
-        self.use_symmetry = True
+        self.use_symmetry = False
         self.use_transpose = False
-        self.save_state_vector_per_qrom = True
+        self.use_gray_code = True
+        self.save_state_vector_per_qrom = False
         self.save_state_vector_per_atom_iteration = True
         self.antisym_method = 3  # binary coded antisymmetrization method
         self.wfr_spec = WaveFunctionRegisterSpec(
@@ -135,6 +136,7 @@ class Parameters:
             elec_proton_potential,
             use_symmetry=self.use_symmetry,
             use_transpose=self.use_transpose,
+            use_gray_code=self.use_gray_code,
             save_state_vector_per_qrom=False)
 
 
@@ -177,6 +179,7 @@ class Parameters:
             elec_proton_potential,
             use_symmetry=self.use_symmetry,
             use_transpose=self.use_transpose,
+            use_gray_code=self.use_gray_code,
             save_state_vector_per_qrom=self.save_state_vector_per_qrom)
 
         self.evo_spec = TimeEvolutionSpec(
@@ -299,7 +302,7 @@ if __name__ == "__main__":
     dim = 2
     qn = args.qnum_n
     qm = args.qnum_m
-    delta_t = 0.01
+    delta_t = 0.02
 
     tag = f"{args.device}_{use_cuStateVec}_{args.bits}b_{args.precision}_{dim}D_n{qn}_m{qm}_dt{delta_t:4.3f}"
 
