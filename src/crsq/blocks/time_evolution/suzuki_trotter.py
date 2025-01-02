@@ -40,7 +40,6 @@ class ElectronMotionBlock(heap.Frame):
     """
     def __init__(self,
                  evo_spec: spec.TimeEvolutionSpec,
-                 sim_time: float,
                  label=" TEV_e(x)", allocate=True, build=True):
         super().__init__(label=label)
         t1 = time.time()
@@ -49,7 +48,6 @@ class ElectronMotionBlock(heap.Frame):
         self._ham_spec = evo_spec.ham_spec
         self._disc_spec = evo_spec.disc_spec
         self._wfr_spec = self._ham_spec.wfr_spec
-        self._sim_time = sim_time
         # registers
         self._e_index_regs: List[List[QuantumRegister]]
         self._n_index_regs: List[List[QuantumRegister]]
@@ -62,6 +60,9 @@ class ElectronMotionBlock(heap.Frame):
         dt = time.time() - t1
         if dt > LOG_TIME_THRESH:
             logger.info("ElectronMotionBlock() took %d msec", round(dt*1000))
+    
+    def set_sim_time(self, sim_time):
+        self._sim_time = sim_time
 
     def allocate_registers(self):
         """ allocate """
@@ -297,6 +298,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         self._energy_configuration_reg: QuantumRegister = None
         self._slater_indices: list[QuantumRegister] = []
         self._slater_ancilla: QuantumRegister = None
+        self._elec_motion_block = None
         if allocate:
             self.allocate_registers()
             if build:
@@ -383,7 +385,6 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         logger.info("save_statevector: %s", label)
         self.circuit.save_statevector(label=label)
 
-
     def _build_initialization_block(self):
         if self._ene_spec.num_energy_configurations > 1:
             self._initialize_with_general_state()
@@ -421,8 +422,11 @@ class SuzukiTrotterMethodBlock(heap.Frame):
             )
 
     def build_electron_motion_block(self, sim_time: float):
-        elec_motion_block = ElectronMotionBlock(self._evo_spec, sim_time)
-        return elec_motion_block
+        # cache the block.
+        if self._elec_motion_block is None:
+            self._elec_motion_block = ElectronMotionBlock(self._evo_spec)
+        self._elec_motion_block.set_sim_time(sim_time)
+        return self._elec_motion_block
 
     def _build_electron_motion_step(self, sim_time):
         wfr_spec = self._wfr_spec

@@ -243,6 +243,7 @@ class Parameters:
             axs[1].legend()
             axs[2].legend()
             fig.savefig(self.outdir + f"/e0_{self.n1}b.{self.num_nucl_iters}n.{self.num_elec_iters}e.t{t:04.3f}.png")
+            plt.close(fig)
 
     def _add_plot(self, axs: list[Axes], time, xg, yg):
         fname = self.outdir + "/" + self.evo_spec.make_state_vector_file_name(time)
@@ -255,7 +256,7 @@ class Parameters:
             for iy in range(self.M):
                 data2d[(ix+self.M//2) % self.M, (iy+self.M//2) % self.M] = np_data2d[ix, iy]
         norm = np.linalg.norm(data2d)
-        logger.info("norm(t=%d)=%f", time, norm)
+        logger.info("norm(t=%4.3f)=%f", time, norm)
         qx = np.linspace(-self.L/2, self.L/2-self.dq, self.M)
         qy = np.linspace(-self.L/2, self.L/2-self.dq, self.M)
         xg, yg = np.meshgrid(qx, qy)
@@ -302,7 +303,7 @@ if __name__ == "__main__":
     dim = 2
     qn = args.qnum_n
     qm = args.qnum_m
-    delta_t = 0.02
+    delta_t = 0.01
 
     tag = f"{args.device}_{use_cuStateVec}_{args.bits}b_{args.precision}_{dim}D_n{qn}_m{qm}_dt{delta_t:4.3f}"
 

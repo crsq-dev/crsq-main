@@ -51,13 +51,11 @@ class RadialFuncGrayCodeQROM(Frame):
         self._data = np.ndarray((M, M), dtype = float)
         for i in range(M):
             si = (i + M // 2) % M - (M // 2)
-            y = si * self._dq
+            y = (si + 0.5) * self._dq
             for j in range(M):
                 sj = (j + M // 2) % M - (M // 2)
-                x = sj * self._dq
+                x = (sj + 0.5) * self._dq
                 r = math.sqrt(x * x + y * y)
-                if r == 0:
-                    r = self._dq / 2
                 psi = self._rfunc(r)
                 if abs(psi) > math.pi:
                     logger.warning("x=%f, y=%f, r=%f, psi=%f", x, y, r, psi)
