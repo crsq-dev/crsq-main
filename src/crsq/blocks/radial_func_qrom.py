@@ -283,13 +283,17 @@ class RadialFuncQrom(Frame):
                 # focus on lower half.
                 wxk = self._wx[k]
                 qc.ccx(wyk, self._x[k], wxk, ctrl_state="01")
-                # do the lower half
-                self._build_area_y(xi, yi * 2, k, wxk, wyk)
-                # middle.
-                # switch focus to upper half
-                qc.cx(wyk, wxk)
-                # do the upper half
-                self._build_area_y(xi + 1, yi * 2, k, wxk, wyk)
+                if k == 0:
+                    # optimized bottom func
+                    self._build_area_y_bottom_dual(xi, yi*2, wxk, wyk)
+                else:
+                    # do the lower half
+                    self._build_area_y(xi, yi * 2, k, wxk, wyk)
+                    # middle.
+                    # switch focus to upper half
+                    qc.cx(wyk, wxk)
+                    # do the upper half
+                    self._build_area_y(xi + 1, yi * 2, k, wxk, wyk)
                 # reset focus
                 qc.ccx(wyk, self._x[k], wxk, ctrl_state="11")
             else:
@@ -343,17 +347,61 @@ class RadialFuncQrom(Frame):
 
     def _build_area_y_bottom(self, xi, yi, wxk: QuantumRegister, wyk: QuantumRegister):
         qc = self.circuit
-        # later bit comes first
-        v = self._data[yi + 1, xi]
-        if v != 0.0:
-            qc.cp(v, wxk, self._y[0])
 
-        # earlier bit comes second
-        v = self._data[yi, xi]
-        if v != 0.0:
+        v0 = self._data[yi, xi]
+        v1 = self._data[yi + 1, xi]
+
+        if v0 != 0.0:
             qc.x(self._y[0])
-            qc.cp(v, wxk, self._y[0])
+            qc.cp(v0, wxk, self._y[0])
             qc.x(self._y[0])
+
+        if v1 != 0.0:
+            qc.cp(v1, wxk, self._y[0])
+
+
+    def _build_area_y_bottom_dual(self, xi, yi, wxk: QuantumRegister, wyk: QuantumRegister):
+        qc = self.circuit
+        v0 = self._data[yi, xi]
+        v1 = self._data[yi + 1, xi]
+        v2 = self._data[yi, xi + 1]
+        v3 = self._data[yi + 1, xi + 1]
+
+        # later bit comes first
+        if v1 != 0.0:
+            qc.cp(v1, wxk, self._y[0])
+
+        if v0 != 0.0:
+            if v2 != 0.0:
+                # has 0, has 2
+                qc.x(self._y[0])
+                qc.cp(v0, wxk, self._y[0])
+                # cancel qc.x(self._y[0])
+
+                qc.cx(wyk, wxk)
+
+                # cancel qc.x(self._y[0])
+                qc.cp(v2, wxk, self._y[0])
+                qc.x(self._y[0])
+            else:
+                # has 0, no 2
+                qc.x(self._y[0])
+                qc.cp(v0, wxk, self._y[0])
+                qc.x(self._y[0])
+
+                qc.cx(wyk, wxk)
+        else:
+            # no 0
+            if v2 != 0.0:
+                #  no 0, has 2
+                qc.cx(wyk, wxk)
+
+                qc.x(self._y[0])
+                qc.cp(v2, wxk, self._y[0])
+                qc.x(self._y[0])
+            else:
+                #  no 0, no 2
+                pass
 
     def bind(self, x: QuantumRegister, y: QuantumRegister):
         return Binding(self, {"x": x, "y": y})
