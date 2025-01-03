@@ -402,6 +402,8 @@ class RadialFuncQrom(Frame):
             else:
                 #  no 0, no 2
                 pass
+        if v3 != 0.0:
+            qc.cp(v3, wxk, self._y[0])
 
     def bind(self, x: QuantumRegister, y: QuantumRegister):
         return Binding(self, {"x": x, "y": y})
