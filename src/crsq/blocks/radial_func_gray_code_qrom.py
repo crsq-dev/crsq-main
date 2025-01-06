@@ -12,6 +12,7 @@ import logging
 import numpy as np
 
 from qiskit import QuantumRegister
+from qiskit.circuit.library import UCRZGate
 from crsq_heap.heap import Frame, Binding
 import crsq_arithmetic as ari
 from crsq.blocks import gray_code_qrom
@@ -72,8 +73,13 @@ class RadialFuncGrayCodeQROM(Frame):
         k = self._num_coord_bits * 2
         alpha = self._data.flatten()
         xbits = QuantumRegister(name="x", bits=self._x[:] + self._y[:])
-        gcqrom = gray_code_qrom.GrayCodeQrom(k, alpha)
-        self.invoke(gcqrom.bind(x=xbits, t=self._t))
+        use_ucrz_gate = True
+        if use_ucrz_gate:
+            ucrz = UCRZGate(alpha.tolist())
+            self.circuit.append(ucrz, xbits[:] + self._t[:])
+        else:
+            gcqrom = gray_code_qrom.GrayCodeQrom(k, alpha)
+            self.invoke(gcqrom.bind(x=xbits, t=self._t))
     
     def bind(self, x: QuantumRegister, y: QuantumRegister, target: QuantumRegister):
         return Binding(self, {"x": x, "y": y, "target": target})
