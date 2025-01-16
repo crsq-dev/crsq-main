@@ -141,8 +141,12 @@ class ElectronMotionBlock(heap.Frame):
             self._temp_allocator.free(t)
             self._save_state_vector_with_suffix("_qrom0")
         with check_time("RfqElectronPotentialBlock.invoke"):
-            self.invoke(block.bind(eregs=self._e_index_regs, nregs=self._n_index_regs,
-                                   target=self._target), invoke_as_instruction=True)
+            if self._rfq_spec.should_use_gray_code:
+                bound = block.bind(eregs=self._e_index_regs, nregs=self._n_index_regs,
+                                   target=self._target)
+            else:
+                bound = block.bind(eregs=self._e_index_regs, nregs=self._n_index_regs)
+            self.invoke(bound, invoke_as_instruction=True)
         if self._rfq_spec.should_save_state_vector_per_qrom:
             self._save_state_vector_with_suffix("_qrom1")
 
@@ -436,11 +440,18 @@ class SuzukiTrotterMethodBlock(heap.Frame):
             elec_motion_block = self.build_electron_motion_block(sim_time)
             logger.info("ElectronMotionBlock.num_qubits = %d", elec_motion_block.circuit.num_qubits)
             with check_time("ElectronMotionBlock.invoke"):
-                self.invoke(elec_motion_block.bind(
-                    eregs=self._e_index_regs,
-                    nregs=self._n_index_regs,
-                    target=self._target,
-                ), invoke_as_instruction=True)
+                if self._evo_spec.rfq_spec.should_use_gray_code:
+                    bound = elec_motion_block.bind(
+                        eregs=self._e_index_regs,
+                        nregs=self._n_index_regs,
+                        target=self._target
+                    )
+                else:
+                    bound = elec_motion_block.bind(
+                        eregs=self._e_index_regs,
+                        nregs=self._n_index_regs
+                    )
+                self.invoke(bound, invoke_as_instruction=True)
             return
         logger.info("ElectronMotionBlock: using individual steps")
         evo_spec = self._evo_spec
