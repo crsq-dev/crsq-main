@@ -20,7 +20,7 @@ from crsq.blocks import gray_code_qrom
 logger = logging.getLogger(__name__)
 LOG_TIME_THRESH = 1
 
-class RadialFuncGrayCodeQROM(Frame):
+class RadialFuncGrayCodeQrom(Frame):
     """ 2D- Radial function implemented using gray code QROM
     """
 
@@ -49,7 +49,7 @@ class RadialFuncGrayCodeQROM(Frame):
     def _prepare_data(self):
         n = self._num_coord_bits
         M = 1 << n
-        self._data = np.ndarray((M, M), dtype = float)
+        self._data = np.ndarray(M*M, dtype = float)
         for i in range(M):
             si = (i + M // 2) % M - (M // 2)
             y = (si + 0.5) * self._dq
@@ -60,7 +60,7 @@ class RadialFuncGrayCodeQROM(Frame):
                 psi = self._rfunc(r)
                 if abs(psi) > math.pi:
                     logger.warning("x=%f, y=%f, r=%f, psi=%f", x, y, r, psi)
-                self._data[i, j] = -2.0 * psi
+                self._data[i*M + j] = -2.0 * psi
 
     def allocate_registers(self):
         n = self._num_coord_bits
@@ -68,18 +68,65 @@ class RadialFuncGrayCodeQROM(Frame):
         self._y = QuantumRegister(n, "y")
         self._t = QuantumRegister(1, "target")
         self.add_param(self._x, self._y, self._t)
+        self._regs = self._x[:] + self._y[:] + self._t[:]
     
+    @property
+    def regs(self):
+        return self._regs
+
     def build_circuit(self):
         k = self._num_coord_bits * 2
-        alpha = self._data.flatten()
-        xbits = QuantumRegister(name="x", bits=self._x[:] + self._y[:])
+        alpha = self._data
+        indexbits = QuantumRegister(name="x", bits=self._x[:] + self._y[:])
         use_ucrz_gate = True
         if use_ucrz_gate:
             ucrz = UCRZGate(alpha.tolist())
-            self.circuit.append(ucrz, xbits[:] + self._t[:])
+            self.circuit.append(ucrz, self._t[:] + indexbits[:])
         else:
             gcqrom = gray_code_qrom.GrayCodeQrom(k, alpha)
-            self.invoke(gcqrom.bind(x=xbits, t=self._t))
+            self.invoke(gcqrom.bind(x=indexbits, t=self._t))
     
     def bind(self, x: QuantumRegister, y: QuantumRegister, target: QuantumRegister):
         return Binding(self, {"x": x, "y": y, "target": target})
+
+
+class RadialFuncGrayCodeQromTestBoard(Frame):
+    def __init__(
+        self,
+        n: int,
+        dq: float,
+        rfunc: callable,
+        use_symmetry=True,
+        use_transpose=True,
+        verbose=True,
+    ):
+        super().__init__(label="RFQTest")
+        self._n = n
+        self._dq = dq
+        self._rfunc = rfunc
+        self._use_symmetry = use_symmetry
+        self._use_transpose = use_transpose
+        self._verbose = verbose
+        self.allocate_registers()
+        self.build_circuit()
+
+    def allocate_registers(self):
+        self._x = QuantumRegister(self._n, "x")
+        self._y = QuantumRegister(self._n, "y")
+        self._target = QuantumRegister(1, "target")
+        self.add_param(self._x, self._y, self._target)
+
+    def build_circuit(self):
+        qc = self.circuit
+        qc.h(self._x)
+        qc.h(self._y)
+        self._rfq = RadialFuncGrayCodeQrom(
+            self._n,
+            self._dq,
+            self._rfunc
+        )
+        self.invoke(self._rfq.bind(x=self._x, y=self._y, target=self._target), invoke_as_instruction=True)
+
+    @property
+    def regs(self):
+        return self._rfq.regs

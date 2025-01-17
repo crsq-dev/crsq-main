@@ -136,7 +136,7 @@ class RfqElectronPotentialBlock(heap.Frame):
         wfr_spec = self._wfr_spec
         rfq_spec = self._rfq_spec
         if rfq_spec.should_use_gray_code:
-            rfgcq = radial_func_gray_code_qrom.RadialFuncGrayCodeQROM(
+            rfgcq = radial_func_gray_code_qrom.RadialFuncGrayCodeQrom(
                 wfr_spec.num_coordinate_bits,
                 wfr_spec.delta_q,
                 rfunc
