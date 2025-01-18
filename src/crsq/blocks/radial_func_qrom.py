@@ -4,9 +4,7 @@
 """ state preparation gates (unary iteration using ancilla qubits)
 """
 
-from typing import List
 import math
-import cmath
 import time
 import logging
 import numpy as np

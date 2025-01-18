@@ -4,9 +4,7 @@
 """ state preparation gates (unary iteration using ancilla qubits)
 """
 
-from typing import List
 import math
-import cmath
 import time
 import logging
 import numpy as np
@@ -14,7 +12,6 @@ import numpy as np
 from qiskit import QuantumRegister
 from qiskit.circuit.library import UCRZGate
 from crsq_heap.heap import Frame, Binding
-import crsq_arithmetic as ari
 from crsq.blocks import gray_code_qrom
 
 logger = logging.getLogger(__name__)

@@ -8,9 +8,7 @@ import logging
 from contextlib import contextmanager
 
 from qiskit import QuantumRegister
-from qiskit.circuit.library import XGate
 from crsq_heap import heap
-import crsq_arithmetic as ari
 from crsq_arithmetic import ast
 from crsq.blocks import wave_function, discretization, hamiltonian, radial_func_qrom, radial_func_gray_code_qrom
 
