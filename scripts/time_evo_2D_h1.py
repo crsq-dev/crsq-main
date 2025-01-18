@@ -250,7 +250,9 @@ class Parameters:
         logger.info("Reading: %s", fname)
         qc = self.stm_block.circuit
         sv = svec.read_from_file(fname)
+        logger.info("Extracting distribution")
         np_data2d = svec.extract_dist2d(qc, sv, "e0y", "e0x")
+        logger.info("make 2d data")
         data2d = np.zeros((self.M, self.M), dtype=np.complex64)
         for ix in range(self.M):
             for iy in range(self.M):
@@ -265,10 +267,14 @@ class Parameters:
         np_ab = np.asnumpy(np.abs(data2d) / self.dq)
         np_re = np.asnumpy(np.real(data2d) / self.dq)
         np_im = np.asnumpy(np.imag(data2d) / self.dq)
+        logger.info("Plot data")
         colormap = plt.get_cmap("cmr.guppy")
-        axs[0].plot_surface(np_xg, np_yg, np_ab, label=f"t={time}", cmap=colormap)
-        axs[1].plot_surface(np_xg, np_yg, np_re, label=f"t={time}", cmap=colormap)
-        axs[2].plot_surface(np_xg, np_yg, np_im, label=f"t={time}", cmap=colormap)
+        axs[0].set_zlim(0, 0.175)
+        axs[0].plot_surface(np_xg, np_yg, np_ab, vmin=-0.2, vmax=0.2, label=f"t={time}", cmap=colormap)
+        axs[1].set_zlim(-0.175, 0.175)
+        axs[1].plot_surface(np_xg, np_yg, np_re, vmin=-0.2, vmax=0.2, label=f"t={time}", cmap=colormap)
+        axs[2].set_zlim(-0.175, 0.175)
+        axs[2].plot_surface(np_xg, np_yg, np_im, vmin=-0.2, vmax=0.2, label=f"t={time}", cmap=colormap)
 
 
 def run_experiment(par: Parameters, tag: str):
