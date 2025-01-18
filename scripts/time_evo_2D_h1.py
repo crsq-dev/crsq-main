@@ -19,7 +19,7 @@ from crsq.models.hydrogen2d import PsiH2D
 
 from qiskit_aer import AerSimulator
 from qiskit import transpile
-import crsq.utils.statevector as svec
+import crsq.utils.sparse_statevector as ssvec
 
 import logging
 
@@ -218,13 +218,14 @@ class Parameters:
             label = self.evo_spec.make_state_vector_label(t, suffix)
             if label in results.data():
                 sv = results.data()[label]
+                ssv = ssvec.sv_to_sparse(sv, eps=1e-12)
                 fname = self.outdir + "/" + self.evo_spec.make_state_vector_file_name(t, suffix)
                 logger.info("State vector label: %s", label)
                 if os.path.exists(fname):
                     logger.info("removing old file : %s", fname)
                     os.remove(fname)
                 logger.info("Saving to : %s", fname)
-                svec.save_to_file(fname, sv, eps=1e-12)
+                ssvec.save_to_file(fname, ssv)
 
 
     def draw_graph(self):
@@ -249,9 +250,9 @@ class Parameters:
         fname = self.outdir + "/" + self.evo_spec.make_state_vector_file_name(time)
         logger.info("Reading: %s", fname)
         qc = self.stm_block.circuit
-        sv = svec.read_from_file(fname)
+        ssv = ssvec.read_from_file(fname)
         logger.info("Extracting distribution")
-        np_data2d = svec.extract_dist2d(qc, sv, "e0y", "e0x")
+        np_data2d = ssvec.extract_dist2d(qc, ssv, "e0y", "e0x")
         logger.info("make 2d data")
         data2d = np.zeros((self.M, self.M), dtype=np.complex64)
         for ix in range(self.M):
