@@ -59,6 +59,11 @@ class TimeEvolutionSpec:
         return self._rfq_spec
 
     @property
+    def should_use_rfq_gray_code(self) -> bool:
+        """ flag that tells rfq hamiltonian should use gray code """
+        return self._rfq_spec and self._rfq_spec.should_use_gray_code
+
+    @property
     def wfr_spec(self) -> wave_function.WaveFunctionRegisterSpec:
         """ wave function register spec """
         return self._ham_spec.wfr_spec

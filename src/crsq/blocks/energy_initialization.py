@@ -322,7 +322,6 @@ class SlaterDeterminantPreparationBlock(Frame):
 
     def _set_orbital_data(self):
         wfr_spec = self._wfr_spec
-        nbits = wfr_spec.num_coordinate_bits
         dim = wfr_spec.dimension
         ene_spec = self._ene_spec
         electrons = ene_spec.initial_electron_orbitals[self._energy_state_index]

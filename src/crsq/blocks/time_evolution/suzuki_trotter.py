@@ -67,11 +67,12 @@ class ElectronMotionBlock(heap.Frame):
     def allocate_registers(self):
         """ allocate """
         wfr_spec = self._wfr_spec
+        evo_spec = self._evo_spec
         self._e_index_regs = wfr_spec.allocate_elec_registers()
         self._n_index_regs = wfr_spec.allocate_nucl_registers()
         self.add_param(("eregs", self._e_index_regs),
                        ("nregs", self._n_index_regs))
-        if self._rfq_spec.should_use_gray_code:
+        if evo_spec.should_use_rfq_gray_code:
             self._target = QuantumRegister(1, "target")
             self.add_param(self._target)
 
@@ -141,7 +142,7 @@ class ElectronMotionBlock(heap.Frame):
             self._temp_allocator.free(t)
             self._save_state_vector_with_suffix("_qrom0")
         with check_time("RfqElectronPotentialBlock.invoke"):
-            if self._rfq_spec.should_use_gray_code:
+            if self._evo_spec.should_use_rfq_gray_code:
                 bound = block.bind(eregs=self._e_index_regs, nregs=self._n_index_regs,
                                    target=self._target)
             else:
@@ -181,7 +182,7 @@ class ElectronMotionBlock(heap.Frame):
              nregs: List[List[QuantumRegister]],
              target: QuantumRegister = None):
         """ bind arguments to the function """
-        if self._rfq_spec.should_use_gray_code:
+        if self._evo_spec.should_use_rfq_gray_code:
             return heap.Binding(self, {
                 "eregs": eregs,
                 "nregs": nregs,
@@ -318,7 +319,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         self._n_index_regs = wfr_spec.allocate_nucl_registers()
         self.add_param(("eregs", self._e_index_regs),
                        ("nregs", self._n_index_regs))
-        if self._evo_spec.rfq_spec.should_use_gray_code:
+        if self._evo_spec.should_use_rfq_gray_code:
             self._target = QuantumRegister(1, "target")
             self.add_param(self._target)
         self._slater_ancilla = asy_spec.allocate_ancilla_register()
@@ -440,7 +441,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
             elec_motion_block = self.build_electron_motion_block(sim_time)
             logger.info("ElectronMotionBlock.num_qubits = %d", elec_motion_block.circuit.num_qubits)
             with check_time("ElectronMotionBlock.invoke"):
-                if self._evo_spec.rfq_spec.should_use_gray_code:
+                if self._evo_spec.should_use_rfq_gray_code:
                     bound = elec_motion_block.bind(
                         eregs=self._e_index_regs,
                         nregs=self._n_index_regs,
@@ -548,6 +549,6 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         }
         if self._slater_ancilla is not None:
             arg_map[self._slater_ancilla.name] = slater_ancilla
-        if self._evo_spec.rfq_spec.should_use_gray_code:
+        if self._evo_spec.should_use_rfq_gray_code:
             arg_map[self._target.name] = target
         return heap.Binding(self, arg_map)

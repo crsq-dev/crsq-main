@@ -87,9 +87,7 @@ class Parameters:
         self.x = np.linspace(0, self.L - self.dq, self.M)
         self.x0 = 8
         self.psix = hydrogen1d_psi(self.x, self.x0, N=1)
-        # ini_dims = [psix, psiy]
-        ini_dims = [self.psix]
-        ini_electrons = [ini_dims]
+        ini_electrons = [self.psix]
         ini_configs = [ini_electrons]
         initial_electron_orbitals = ini_configs
 
