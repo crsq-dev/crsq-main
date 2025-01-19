@@ -156,7 +156,7 @@ class Parameters:
 
 
         fname = self.outdir + "/h2d.circuit.png"
-        self.stm_block.circuit.draw(output="mpl", filename=fname, scale=0.6)
+        self.stm_block.circuit.draw(output="mpl", filename=fname, scale=0.6, fold=100)
         logger.info("draw the circuit to %s", fname)
 
 
