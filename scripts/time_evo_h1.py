@@ -105,6 +105,7 @@ class Parameters:
             self.num_nucl_iters,
             self.num_elec_iters,
             save_state_vector_per_atom_iteration=False,
+            use_for_loop_gate=True,
         )
 
         self.stm_block = SuzukiTrotterMethodBlock(
@@ -180,8 +181,8 @@ class Parameters:
             self._add_plot(axs, t, x, wrap)
 
         axs[0].legend()
-        axs[1].legend()
-        axs[2].legend()
+        # axs[1].legend()
+        # axs[2].legend()
         fig.savefig(self.outdir + f"/ex0_{self.n1}b.{self.num_nucl_iters}n.{self.num_elec_iters}e.dist.png")
 
     def _add_plot(self, axs, time, x, wrap):
@@ -196,9 +197,9 @@ class Parameters:
         ab = np.abs(y) / math.sqrt(self.dq)
         re = np.real(y) / math.sqrt(self.dq)
         im = np.imag(y) / math.sqrt(self.dq)
-        axs[0].plot(x, ab, label=f"t={time}")
-        axs[1].plot(x, re, label=f"t={time}")
-        axs[2].plot(x, im, label=f"t={time}")
+        axs[0].plot(x, ab, label=f"t={time:4.3f}")
+        axs[1].plot(x, re, label=f"t={time:4.3f}")
+        axs[2].plot(x, im, label=f"t={time:4.3f}")
 
 
 def run_experiment(par: Parameters, tag: str):

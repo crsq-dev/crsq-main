@@ -352,8 +352,28 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         n_elec_it = evo_spec.num_elec_per_atom_iterations
         sim_time = 0.0
         delta_t = self._evo_spec.disc_spec.delta_t
-        # with qc.for_loop(range(n_atom_it)):
-        #     with qc.for_loop(range(n_elec_it)):
+        if evo_spec.should_use_for_loop_gate:
+            self._build_time_evolution_circuit_without_save_for_loop_gate(n_atom_it, n_elec_it, sim_time, delta_t)
+        else:
+            self._build_time_evolution_circuit_without_save_flat_loop(n_atom_it, n_elec_it, sim_time, delta_t)
+
+    def _build_time_evolution_circuit_without_save_for_loop_gate(self, n_atom_it, n_elec_it, sim_time, delta_t):
+        qc = self.circuit
+        evo_spec = self._evo_spec
+        n_atom_it = evo_spec.num_atom_iterations
+        n_elec_it = evo_spec.num_elec_per_atom_iterations
+        with qc.for_loop(range(n_atom_it)):
+            with qc.for_loop(range(n_elec_it)):
+                if self._evo_spec.should_calculate_electron_motion:
+                    self._build_electron_motion_step(sim_time)
+                sim_time += delta_t
+            if self._evo_spec.should_calculate_nucleus_motion:
+                self._build_nuclei_motion_block(sim_time)
+
+    def _build_time_evolution_circuit_without_save_flat_loop(self, n_atom_it, n_elec_it, sim_time, delta_t):
+        evo_spec = self._evo_spec
+        n_atom_it = evo_spec.num_atom_iterations
+        n_elec_it = evo_spec.num_elec_per_atom_iterations
         for _atom_it in range(n_atom_it):
             for _elec_it in range(n_elec_it):
                 if evo_spec.should_calculate_electron_motion:
@@ -363,7 +383,6 @@ class SuzukiTrotterMethodBlock(heap.Frame):
                 self._build_nuclei_motion_block(sim_time)
 
     def _build_time_evolution_circuit_with_save(self):
-        qc = self.circuit
         evo_spec = self._evo_spec
         n_atom_it = evo_spec.num_atom_iterations
         n_elec_it = evo_spec.num_elec_per_atom_iterations
@@ -373,8 +392,32 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         # we need to go through the circuit one loop to get all registers allocated.
         # self._save_state_vector(time)
 
-        # with qc.for_loop(range(n_atom_it)):
-        #     with qc.for_loop(range(n_elec_it)):
+        if evo_spec.should_use_for_loop_gate:
+            logger.info("Using for loop gate")
+            self._build_time_evolution_circuit_with_save_for_loop_gate(n_atom_it, n_elec_it, sim_time, delta_t)
+        else:
+            logger.info("Using flat loop")
+            self._build_time_evolution_circuit_with_save_flat_loop(n_atom_it, n_elec_it, sim_time, delta_t)
+
+    def _build_time_evolution_circuit_with_save_for_loop_gate(self, n_atom_it, n_elec_it, sim_time, delta_t):
+        qc = self.circuit
+        evo_spec = self._evo_spec
+        n_atom_it = evo_spec.num_atom_iterations
+        n_elec_it = evo_spec.num_elec_per_atom_iterations
+        with qc.for_loop(range(n_atom_it)):
+            with qc.for_loop(range(n_elec_it)):
+                logger.info("before electron motion step. sim_time=%f", sim_time)
+                if evo_spec.should_calculate_electron_motion:
+                    self._build_electron_motion_step(sim_time)
+                sim_time += delta_t
+            if evo_spec.should_calculate_nucleus_motion:
+                self._build_nuclei_motion_block(sim_time)
+            self._save_state_vector(sim_time)
+
+    def _build_time_evolution_circuit_with_save_flat_loop(self, n_atom_it, n_elec_it, sim_time, delta_t):
+        evo_spec = self._evo_spec
+        n_atom_it = evo_spec.num_atom_iterations
+        n_elec_it = evo_spec.num_elec_per_atom_iterations
         for _atom_it in range(n_atom_it):
             for _elec_it in range(n_elec_it):
                 logger.info("before electron motion step. sim_time=%f", sim_time)
@@ -384,6 +427,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
             if evo_spec.should_calculate_nucleus_motion:
                 self._build_nuclei_motion_block(sim_time)
             self._save_state_vector(sim_time)
+
 
     def _save_state_vector(self, sim_time):
         label = self._evo_spec.make_state_vector_label(sim_time)

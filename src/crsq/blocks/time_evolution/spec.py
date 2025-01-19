@@ -21,7 +21,8 @@ class TimeEvolutionSpec:
                  method: str = SUZUKI_TROTTER_ARITHMETIC,
                  rfq_spec: rfqhamiltonian.RfqPotentialSpec = None,
                  save_state_vector_per_atom_iteration: bool = False,
-                 save_state_vector_per_qft: bool = False
+                 save_state_vector_per_qft: bool = False,
+                 use_for_loop_gate: bool = False,
                  ):
         assert isinstance(ham_spec, hamiltonian.HamiltonianSpec)
         assert isinstance(disc_spec, discretization.DiscretizationSpec)
@@ -40,6 +41,7 @@ class TimeEvolutionSpec:
         self._should_save_state_vector_per_atom_iteration = save_state_vector_per_atom_iteration
         self._should_save_state_vector_per_qft = save_state_vector_per_qft
         self._should_apply_qft = True
+        self._should_use_for_loop_gate = use_for_loop_gate
         valid_methods = [SUZUKI_TROTTER_ARITHMETIC, SUZUKI_TROTTER_QROM]
         if method not in valid_methods:
             raise ValueError(f"method must be one of {valid_methods}")
@@ -47,6 +49,11 @@ class TimeEvolutionSpec:
             raise ValueError("rfq_spec is required when method is SUZUKI_TROTTER_QROM")
         self._method = method
         self._rfq_spec = rfq_spec
+
+    @property
+    def should_use_for_loop_gate(self) -> bool:
+        """ flag that tells for loop gate should be used """
+        return self._should_use_for_loop_gate
 
     @property
     def ham_spec(self) -> hamiltonian.HamiltonianSpec:
