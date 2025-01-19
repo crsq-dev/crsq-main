@@ -114,13 +114,13 @@ class Parameters:
         logger.info("draw the circuit")
 
         fname = self.outdir + "/h1d.circuit.png"
-        self.stm_block.circuit.draw(output="mpl", filename=fname, scale=0.6)
+        self.stm_block.circuit.draw(output="mpl", filename=fname, scale=0.6, fold=100)
 
         # draw the circuit
 
         epot = self.stm_block.build_elec_potential_block()
         fname = self.outdir + "/h1d.circuit.elec_potential.png"
-        epot.circuit.draw(output="mpl", filename=fname, scale=0.6)
+        epot.circuit.draw(output="mpl", filename=fname, scale=0.6, fold=100)
 
     def run_circuit(self):
         # run the simulator
