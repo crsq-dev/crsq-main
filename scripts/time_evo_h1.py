@@ -75,7 +75,7 @@ class Parameters:
         self.disc_spec = DiscretizationSpec(self.delta_t)
         self.asy_spec = AntisymmetrizationSpec(self.wfr_spec, self.antisym_method)
         self.nuclei_data = [
-            {"mass": 1680, "charge": 1, "pos": (self.M // 2, self.M // 2)}
+            {"mass": 1680, "charge": 1, "pos": (0)}
         ]
 
         self.ham_spec = HamiltonianSpec(self.wfr_spec, nuclei_data=self.nuclei_data)
@@ -169,10 +169,12 @@ class Parameters:
         axs[0].set_title("abs")
         axs[1].set_title("real")
         axs[2].set_title("imag")
-        x = np.linspace(0, self.L, self.M + 1)
+        x = np.linspace(-self.L/2, self.L/2, self.M + 1)
 
         def wrap(x):
-            return np.append(x, x[:1])
+            m = x.shape[0]
+            hm = m // 2
+            return np.append(x[hm:], x[:hm+1])
 
         dt = self.disc_spec.delta_t
         t = 0
