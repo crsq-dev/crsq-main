@@ -174,7 +174,7 @@ class Parameters:
         def wrap(x):
             m = x.shape[0]
             hm = m // 2
-            return np.append(x[hm:], x[:hm+1])
+            return np.append(x, x[:1])
 
         dt = self.disc_spec.delta_t
         t = 0
