@@ -120,14 +120,19 @@ class Simulator(heap.Frame):
     
     def _build_time_evolution_with_suzuki_trotter(self):
         st_block = time_evolution.SuzukiTrotterMethodBlock(self._evo_spec, self._ene_spec, self._asy_spec)
+        if self._ene_spec.num_energy_configurations > 1:
+            ene_conf_reg = self._energy_configuration_reg
+        else:
+            ene_conf_reg = None
         with check_time("SuzukiTrotterIntegrator.invoke"):
             self.invoke(
                 st_block.bind(
                     eregs=self._e_index_regs,
                     nregs=self._n_index_regs,
+                    target=None,
                     slater_indices=self._slater_indices,
                     slater_ancilla=self._slater_ancilla,
-                    p=self._energy_configuration_reg,
+                    p=ene_conf_reg
                 ),
                 invoke_as_instruction=True
             )
