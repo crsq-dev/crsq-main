@@ -217,6 +217,7 @@ class Parameters:
         axs[1].imshow(re)
         axs[2].imshow(im)
         fig.savefig(self.outdir + f"/frame_{time:06.3f}.png")
+        plt.close(fig)
         logger.info("png frame saved.")
 
     def produce_frame3d3(self, t: float):

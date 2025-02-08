@@ -186,6 +186,7 @@ class Parameters:
         # axs[1].legend()
         # axs[2].legend()
         fig.savefig(self.outdir + f"/ex0_{self.n1}b.{self.num_nucl_iters}n.{self.num_elec_iters}e.dist.png")
+        plt.close(fig)
 
     def _add_plot(self, axs, time, x, wrap):
         fname = self.outdir + "/" + self.evo_spec.make_state_vector_file_name(time)
