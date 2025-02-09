@@ -47,6 +47,7 @@ class Parameters:
         enable_cuStateVec=True,
         dim=1,
         precision="single",
+        delta_t=0.001,
         n1=5,
         num_nucl_iters=1,
         num_elec_iters=1,
@@ -71,7 +72,7 @@ class Parameters:
             self.dim, self.n1, self.L, self.eta, self.Ln, self.Ls
         )
 
-        self.delta_t = 0.001  # a.u.
+        self.delta_t = delta_t  # a.u.
         self.disc_spec = DiscretizationSpec(self.delta_t)
         self.asy_spec = AntisymmetrizationSpec(self.wfr_spec, self.antisym_method)
         self.nuclei_data = [
@@ -230,11 +231,12 @@ if __name__ == "__main__":
     parser.add_argument("--num-nucl-iters", type=int, default=1)
     parser.add_argument("--num-elec-iters", type=int, default=1)
     parser.add_argument("--use-saved-data", type=str, default="False")
+    parser.add_argument("--delta-t", type=float, default=0.001)
     args = parser.parse_args()
 
     use_cuStateVec = "cuStateVec" if args.enable_cuStateVec == "True" else "statevector"
 
-    tag = f"{args.device}_{use_cuStateVec}_{args.dim}D_{args.precision}_{args.bits}b"
+    tag = f"{args.device}_{use_cuStateVec}_{args.dim}D_{args.precision}_{args.bits}b_dt{args.delta_t}"
 
     outdir = "output/" + tag
     os.makedirs(outdir, exist_ok=True)
@@ -252,6 +254,7 @@ if __name__ == "__main__":
     logger.info("enable_cuStateVec : %s", args.enable_cuStateVec)
     logger.info("Dimension : %s", args.dim)
     logger.info("Precision : %s", args.precision)
+    logger.info("delta_t : %f", args.delta_t)
     logger.info("num nucl iters : %d", args.num_nucl_iters)
     logger.info("num elec iters : %d", args.num_elec_iters)
     logger.info("use saved data : %s", args.use_saved_data)
@@ -263,6 +266,7 @@ if __name__ == "__main__":
         args.enable_cuStateVec == "True",
         args.dim,
         args.precision,
+        args.delta_t,
         args.bits,
         args.num_nucl_iters,
         args.num_elec_iters,
