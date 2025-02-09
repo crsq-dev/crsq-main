@@ -20,12 +20,16 @@ LOG_TIME_THRESH = 1
 class RadialFuncQrom(Frame):
     """2D- Radial function implemented as QROM
 
-    Args:
+    Args of init:
         n: bits per dimension
         dq: grid spacing
         rfunc: function of the form rfunc(r: float) -> float
         use_symmetry: use x-axis or y-axis symmetry of the function f(x,y) = f(-x,y) , f(x,y) = f(x, -y)
         use_transpose: use transpositional symmetry of the function f(x,y) = f(y,x)
+    
+    Args of the gate:
+        x: value of x1 - x2.  Need not be positive.
+        y: value of y1 - y2.  Need not be positive.
     """
 
     def __init__(
@@ -356,7 +360,6 @@ class RadialFuncQrom(Frame):
 
         if v1 != 0.0:
             qc.cp(v1, wxk, self._y[0])
-
 
     def _build_area_y_bottom_dual(self, xi, yi, wxk: QuantumRegister, wyk: QuantumRegister):
         qc = self.circuit

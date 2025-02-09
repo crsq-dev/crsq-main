@@ -7,7 +7,12 @@ from crsq.blocks.antisymmetrization import AntisymmetrizationSpec
 from crsq.blocks.discretization import DiscretizationSpec
 from crsq.blocks.energy_initialization import EnergyConfigurationSpec
 from crsq.blocks.hamiltonian import HamiltonianSpec
-from crsq.blocks.time_evolution.spec import TimeEvolutionSpec
+from crsq.blocks.rfqhamiltonian import RfqPotentialSpec
+from crsq.blocks.time_evolution.spec import (
+    TimeEvolutionSpec,
+    SUZUKI_TROTTER_ARITHMETIC,
+    SUZUKI_TROTTER_QROM,
+)
 from crsq.blocks.wave_function import WaveFunctionRegisterSpec
 from crsq.blocks.time_evolution.suzuki_trotter import SuzukiTrotterMethodBlock
 
@@ -36,6 +41,18 @@ def hydrogen1d_psi(xa: np.ndarray, x0: float, N: int):
     return psi
 
 
+def elec_proton_potential(r: float) -> float:
+    if r == 0:
+        raise ValueError("r == 0")
+    return -1 / r
+
+
+def elec_elec_potential(r: float) -> float:
+    if r == 0:
+        raise ValueError("r == 0")
+    return 1 / r
+
+
 # build the simulator
 
 
@@ -51,6 +68,7 @@ class Parameters:
         n1=5,
         num_nucl_iters=1,
         num_elec_iters=1,
+        st_method=SUZUKI_TROTTER_ARITHMETIC,
         use_saved_data=False,
     ):
         self.outdir = outdir
@@ -67,26 +85,18 @@ class Parameters:
         self.Ls = 1  # stationary nucleus
         self.num_nucl_iters = num_nucl_iters
         self.num_elec_iters = num_elec_iters
+        self.st_method = st_method
         self.antisym_method = 3  # binary coded antisymmetrization method
         self.wfr_spec = WaveFunctionRegisterSpec(
             self.dim, self.n1, self.L, self.eta, self.Ln, self.Ls
         )
 
-        self.delta_t = delta_t  # a.u.
-        self.disc_spec = DiscretizationSpec(self.delta_t)
-        self.asy_spec = AntisymmetrizationSpec(self.wfr_spec, self.antisym_method)
-        self.nuclei_data = [
-            {"mass": 1680, "charge": 1, "pos": (0)}
-        ]
-
-        self.ham_spec = HamiltonianSpec(self.wfr_spec, nuclei_data=self.nuclei_data)
-        self.use_saved_data = use_saved_data
-        self.stm_block = None
-
-    def draw_circuits(self):
-
+        # series of x coordinates.
         self.x = np.linspace(0, self.L - self.dq, self.M)
-        self.x0 = 8
+        # atom position
+        # self.x0 = (self.M/2 + 0.5) * self.dq
+        self.x0 = self.L/2
+        logger.info("x0=%f", self.x0)
         self.psix = hydrogen1d_psi(self.x, self.x0, N=1)
         ini_electrons = [self.psix]
         ini_configs = [ini_electrons]
@@ -97,20 +107,48 @@ class Parameters:
             [1], initial_electron_orbitals, initial_nucleus_orbitals
         )
 
-        # psix = np.zeros(M)
-        # psiy = np.zeros(M)
+        self.delta_t = delta_t  # a.u.
+        self.disc_spec = DiscretizationSpec(self.delta_t)
+        self.asy_spec = AntisymmetrizationSpec(self.wfr_spec, self.antisym_method)
+        self.nuclei_data = [{"mass": 1680, "charge": 1, "pos": (self.x0/self.dq)}]
+
+        if self.st_method == SUZUKI_TROTTER_QROM:
+            self.rfq_spec = RfqPotentialSpec(
+                self.wfr_spec,
+                elec_elec_potential,
+                elec_proton_potential,
+                use_symmetry=False,
+                use_transpose=False,
+                use_gray_code=True,
+            )
+            self.use_motion_block_gates = True
+        else:
+            self.rfq_spec = None
+            self.use_motion_block_gates = False
+
+        self.ham_spec = HamiltonianSpec(self.wfr_spec, nuclei_data=self.nuclei_data)
+
+        self.use_saved_data = use_saved_data
+        self.stm_block = None
+
+    def draw_circuits(self):
 
         self.evo_spec = TimeEvolutionSpec(
             self.ham_spec,
             self.disc_spec,
             self.num_nucl_iters,
             self.num_elec_iters,
+            self.st_method,
+            self.rfq_spec,
             save_state_vector_per_atom_iteration=False,
             use_for_loop_gate=True,
         )
 
         self.stm_block = SuzukiTrotterMethodBlock(
-            self.evo_spec, self.ene_spec, self.asy_spec
+            self.evo_spec,
+            self.ene_spec,
+            self.asy_spec,
+            use_motion_block_gates=self.use_motion_block_gates,
         )
 
         logger.info("draw the circuit")
@@ -120,9 +158,17 @@ class Parameters:
 
         # draw the circuit
 
-        epot = self.stm_block.build_elec_potential_block()
-        fname = self.outdir + "/h1d.circuit.elec_potential.png"
-        epot.circuit.draw(output="mpl", filename=fname, scale=0.6, fold=100)
+        if self.use_motion_block_gates:
+            emb = self.stm_block.build_electron_motion_block(sim_time = 0)
+            fname = self.outdir + "/h1d.circuit.elec_motion.png"
+            emb.circuit.draw(output="mpl", filename=fname, scale=0.6, fold=100)
+            epbq = emb.build_elec_potential_block_qrom()
+            fname = self.outdir + "/h1d.circuit.elec_potential_qrom.png"
+            epbq.circuit.draw(output="mpl", filename=fname, scale=0.6, fold=100)
+        else:
+            epot = self.stm_block.build_elec_potential_block()
+            fname = self.outdir + "/h1d.circuit.elec_potential.png"
+            epot.circuit.draw(output="mpl", filename=fname, scale=0.6, fold=100)
 
     def run_circuit(self):
         # run the simulator
@@ -141,9 +187,16 @@ class Parameters:
             self.disc_spec,
             self.num_nucl_iters,
             self.num_elec_iters,
+            self.st_method,
+            self.rfq_spec,
             save_state_vector_per_atom_iteration=True,
         )
-        stm = SuzukiTrotterMethodBlock(evo_spec, self.ene_spec, self.asy_spec)
+        stm = SuzukiTrotterMethodBlock(
+            evo_spec,
+            self.ene_spec,
+            self.asy_spec,
+            use_motion_block_gates=self.use_motion_block_gates,
+        )
 
         circ = stm.circuit
         logger.info("transpile START")
@@ -170,7 +223,7 @@ class Parameters:
         axs[0].set_title("abs")
         axs[1].set_title("real")
         axs[2].set_title("imag")
-        x = np.linspace(-self.L/2, self.L/2, self.M + 1)
+        x = np.linspace(-self.L / 2, self.L / 2, self.M + 1)
 
         def wrap(x):
             m = x.shape[0]
@@ -186,7 +239,10 @@ class Parameters:
         axs[0].legend()
         # axs[1].legend()
         # axs[2].legend()
-        fig.savefig(self.outdir + f"/ex0_{self.n1}b.{self.num_nucl_iters}n.{self.num_elec_iters}e.dist.png")
+        fig.savefig(
+            self.outdir
+            + f"/ex0_{self.n1}b.{self.num_nucl_iters}n.{self.num_elec_iters}e.dist.png"
+        )
         plt.close(fig)
 
     def _add_plot(self, axs, time, x, wrap):
@@ -218,7 +274,6 @@ def run_experiment(par: Parameters, tag: str):
     logger.info("done")
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="time_evo_h1", description="Time evolution of H atom"
@@ -230,13 +285,19 @@ if __name__ == "__main__":
     parser.add_argument("--bits", type=int, default=5)
     parser.add_argument("--num-nucl-iters", type=int, default=1)
     parser.add_argument("--num-elec-iters", type=int, default=1)
+    parser.add_argument(
+        "--st-method",
+        type=str,
+        default=SUZUKI_TROTTER_ARITHMETIC,
+        choices=[SUZUKI_TROTTER_ARITHMETIC, SUZUKI_TROTTER_QROM],
+    )
     parser.add_argument("--use-saved-data", type=str, default="False")
     parser.add_argument("--delta-t", type=float, default=0.001)
     args = parser.parse_args()
 
     use_cuStateVec = "cuStateVec" if args.enable_cuStateVec == "True" else "statevector"
 
-    tag = f"{args.device}_{use_cuStateVec}_{args.dim}D_{args.precision}_{args.bits}b_dt{args.delta_t}"
+    tag = f"{args.device}_{use_cuStateVec}_{args.st_method}_{args.dim}D_{args.precision}_{args.bits}b_dt{args.delta_t}"
 
     outdir = "output/" + tag
     os.makedirs(outdir, exist_ok=True)
@@ -247,7 +308,7 @@ if __name__ == "__main__":
         level=logging.WARNING,
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    logging.getLogger('crsq').setLevel(logging.INFO)
+    logging.getLogger("crsq").setLevel(logging.INFO)
     logger.setLevel(logging.INFO)
 
     logger.info("Device : %s", args.device)
@@ -257,6 +318,7 @@ if __name__ == "__main__":
     logger.info("delta_t : %f", args.delta_t)
     logger.info("num nucl iters : %d", args.num_nucl_iters)
     logger.info("num elec iters : %d", args.num_elec_iters)
+    logger.info("ST method : %s", args.st_method)
     logger.info("use saved data : %s", args.use_saved_data)
     logger.info("Tag : %s", tag)
 
@@ -270,6 +332,7 @@ if __name__ == "__main__":
         args.bits,
         args.num_nucl_iters,
         args.num_elec_iters,
+        args.st_method,
         args.use_saved_data == "True",
     )
     run_experiment(par, tag)
