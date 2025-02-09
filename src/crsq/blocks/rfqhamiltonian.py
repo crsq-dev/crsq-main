@@ -135,11 +135,11 @@ class RfqElectronPotentialBlock(heap.Frame):
 
     def _elec_elec_phase_shift(self, r: float):
         """-delta_t * Vee(r)"""
-        return -self._disc_spec.delta_t / self._wfr_spec.delta_q * self._rfq_spec.elec_elec_potential_func(r)
+        return -self._disc_spec.delta_t * self._rfq_spec.elec_elec_potential_func(r)
 
     def _elec_nucl_phase_shift(self, r: float):
         """-delta_t * Ven(r)"""
-        return -self._disc_spec.delta_t / self._wfr_spec.delta_q * self._rfq_spec.elec_nucl_potential_func(r)
+        return -self._disc_spec.delta_t * self._rfq_spec.elec_nucl_potential_func(r)
 
     def _apply_radial_func_qrom_1d(self, xr: ast.Register, rfunc):
         wfr_spec = self._wfr_spec
