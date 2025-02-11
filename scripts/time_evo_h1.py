@@ -15,6 +15,7 @@ from crsq.blocks.time_evolution.spec import (
 )
 from crsq.blocks.wave_function import WaveFunctionRegisterSpec
 from crsq.blocks.time_evolution.suzuki_trotter import SuzukiTrotterMethodBlock
+from crsq.reports import H1D1Report
 
 from qiskit_aer import AerSimulator
 from qiskit import transpile
@@ -128,12 +129,24 @@ class Parameters:
 
         self.ham_spec = HamiltonianSpec(self.wfr_spec, nuclei_data=self.nuclei_data)
 
+        self.evo_spec = TimeEvolutionSpec(
+            self.ham_spec,
+            self.disc_spec,
+            self.num_nucl_iters,
+            self.num_elec_iters,
+            self.st_method,
+            self.rfq_spec,
+            save_state_vector_per_atom_iteration=True,
+        )
+
         self.use_saved_data = use_saved_data
         self.stm_block = None
 
+        self.report = H1D1Report(outdir, "H1D1", self.wfr_spec, self.evo_spec)
+
     def draw_circuits(self):
 
-        self.evo_spec = TimeEvolutionSpec(
+        evo_spec_for_draw = TimeEvolutionSpec(
             self.ham_spec,
             self.disc_spec,
             self.num_nucl_iters,
@@ -144,31 +157,27 @@ class Parameters:
             use_for_loop_gate=True,
         )
 
-        self.stm_block = SuzukiTrotterMethodBlock(
-            self.evo_spec,
+        stm_block = SuzukiTrotterMethodBlock(
+            evo_spec_for_draw,
             self.ene_spec,
             self.asy_spec,
             use_motion_block_gates=self.use_motion_block_gates,
         )
 
         logger.info("draw the circuit")
-
-        fname = self.outdir + "/h1d.circuit.png"
-        self.stm_block.circuit.draw(output="mpl", filename=fname, scale=0.6, fold=100)
+        self.report.add_circuit_diagram(stm_block.circuit, "circuit")
 
         # draw the circuit
 
         if self.use_motion_block_gates:
-            emb = self.stm_block.build_electron_motion_block(sim_time = 0)
-            fname = self.outdir + "/h1d.circuit.elec_motion.png"
-            emb.circuit.draw(output="mpl", filename=fname, scale=0.6, fold=100)
+            emb = stm_block.build_electron_motion_block(sim_time = 0)
+            self.report.add_circuit_diagram(emb.circuit, "elec_motion")
+
             epbq = emb.build_elec_potential_block_qrom()
-            fname = self.outdir + "/h1d.circuit.elec_potential_qrom.png"
-            epbq.circuit.draw(output="mpl", filename=fname, scale=0.6, fold=100)
+            self.report.add_circuit_diagram(epbq.circuit, "elec_potential_qrom")
         else:
-            epot = self.stm_block.build_elec_potential_block()
-            fname = self.outdir + "/h1d.circuit.elec_potential.png"
-            epot.circuit.draw(output="mpl", filename=fname, scale=0.6, fold=100)
+            epot = stm_block.build_elec_potential_block()
+            self.report.add_circuit_diagram(epot.circuit, "elec_potential")
 
     def run_circuit(self):
         # run the simulator
@@ -182,23 +191,14 @@ class Parameters:
         )
         backend.set_options(max_parallel_threads=0)
 
-        evo_spec = TimeEvolutionSpec(
-            self.ham_spec,
-            self.disc_spec,
-            self.num_nucl_iters,
-            self.num_elec_iters,
-            self.st_method,
-            self.rfq_spec,
-            save_state_vector_per_atom_iteration=True,
-        )
-        stm = SuzukiTrotterMethodBlock(
-            evo_spec,
+        self.stm_block = SuzukiTrotterMethodBlock(
+            self.evo_spec,
             self.ene_spec,
             self.asy_spec,
             use_motion_block_gates=self.use_motion_block_gates,
         )
 
-        circ = stm.circuit
+        circ = self.stm_block.circuit
         logger.info("transpile START")
         transpiled = transpile(circ, backend)
         logger.info("transpile END, run START")
@@ -219,33 +219,17 @@ class Parameters:
 
     def draw_graph(self):
         """draw the graph based on the results file."""
-        fig, axs = plt.subplots(3, 1, figsize=(6, 12))
-        axs[0].set_title("abs")
-        axs[1].set_title("real")
-        axs[2].set_title("imag")
-        x = np.linspace(-self.L / 2, self.L / 2, self.M + 1)
-
-        def wrap(x):
-            m = x.shape[0]
-            hm = m // 2
-            return np.append(x, x[:1])
+        self.report.open_figure()
 
         dt = self.disc_spec.delta_t
         t = 0
         for _nucl_it in range(self.num_nucl_iters):
             t += dt * self.evo_spec.num_elec_per_atom_iterations
-            self._add_plot(axs, t, x, wrap)
+            self._add_plot(t)
 
-        axs[0].legend()
-        # axs[1].legend()
-        # axs[2].legend()
-        fig.savefig(
-            self.outdir
-            + f"/ex0_{self.n1}b.{self.num_nucl_iters}n.{self.num_elec_iters}e.dist.png"
-        )
-        plt.close(fig)
+        self.report.generate_figure()
 
-    def _add_plot(self, axs, time, x, wrap):
+    def _add_plot(self, time):
         fname = self.outdir + "/" + self.evo_spec.make_state_vector_file_name(time)
         logger.info("Reading: %s", fname)
         qc = self.stm_block.circuit
@@ -253,13 +237,7 @@ class Parameters:
         data = svec.extract_dist(qc, sv, "e0x", eps=1e-12)
         norm = np.linalg.norm(data)
         logger.info("norm(t=%d)=%f", time, norm)
-        y = wrap(data)
-        ab = np.abs(y) / math.sqrt(self.dq)
-        re = np.real(y) / math.sqrt(self.dq)
-        im = np.imag(y) / math.sqrt(self.dq)
-        axs[0].plot(x, ab, label=f"t={time:4.3f}")
-        axs[1].plot(x, re, label=f"t={time:4.3f}")
-        axs[2].plot(x, im, label=f"t={time:4.3f}")
+        self.report.add_wave_function_plot(time, data)
 
 
 def run_experiment(par: Parameters, tag: str):
