@@ -18,7 +18,7 @@ class StateEmbedGate2(Frame):
     """
     def __init__(self, data: List[float] | List[complex], build=True):
         super().__init__()
-        logger.info("start: StateEmbedGate()")
+        logger.info("start: StateEmbedGate2()")
         t1 = time.time()
         num_bits = math.ceil(math.log2(len(data)))
         if 2**num_bits != len(data):
@@ -34,7 +34,7 @@ class StateEmbedGate2(Frame):
         t2 = time.time()
         dt = t2 - t1
         if dt > LOG_TIME_THRESH:
-            logger.info("end  : StateEmbedGate() %f msec", round(dt*1000))
+            logger.info("end  : StateEmbedGate2() %f msec", round(dt*1000))
 
     def allocate_registers(self):
         """ allocate """
@@ -45,6 +45,7 @@ class StateEmbedGate2(Frame):
 
     def build_circuit(self):
         """ build """
+        logger.info("start: StateEmbedGate2.build()")
         norms = self.build_norm_tree()
         phases = self.build_phase_tree()
         n = self._num_bits
@@ -57,6 +58,7 @@ class StateEmbedGate2(Frame):
         avg0 = phases[0][0]
         avg1 = phases[1][0]
         phi = avg1 - avg0
+        logger.info("avg_phase = %f", (avg1 + avg0)/2)
 
         bit = n - 1
         if theta == math.pi:
@@ -73,7 +75,8 @@ class StateEmbedGate2(Frame):
             qc.x(self._work[bit-1])
             self.build_structure_for_bit(bit-1, norms[1][1], phases[1][1])
             qc.cx(self._qreg[bit], self._work[bit-1])
-    
+
+
     def build_norm_tree(self):
         norm0 = [(abs(x),) for x in self._data]
         while len(norm0) >= 4:
@@ -88,6 +91,7 @@ class StateEmbedGate2(Frame):
 
     def build_phase_tree(self):
         avg0 = [(cmath.phase(x),) for x in self._data]
+        print("avg0", [tpl[0]/math.pi for tpl in avg0])
         while len(avg0) >= 4:
             avg1 = []
             for j in range(len(avg0)//2):

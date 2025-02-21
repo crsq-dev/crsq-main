@@ -63,7 +63,6 @@ class Parameters:
         outdir="output/default",
         device="GPU",
         enable_cuStateVec=True,
-        dim=1,
         precision="single",
         delta_t=0.001,
         n1=5,
@@ -76,7 +75,7 @@ class Parameters:
         self.device = device
         self.enable_cuStateVec = enable_cuStateVec
         self.precision = precision
-        self.dim = dim  # 1 dimension
+        self.dim = 1  # 1 dimension
         self.n1 = n1  # bits per coordinate
         self.M = 1 << n1
         self.L = 16  # 16 bohr
@@ -96,8 +95,8 @@ class Parameters:
         self.x = np.linspace(0, self.L - self.dq, self.M)
         # atom position
         # self.x0 = (self.M/2 + 0.5) * self.dq
-        self.x0 = self.L/2
-        logger.info("x0=%f", self.x0)
+        self.x0 = self.L / 2
+        logger.info("atom pos x0=%f", self.x0)
         self.psix = hydrogen1d_psi(self.x, self.x0, N=1)
         ini_electrons = [self.psix]
         ini_configs = [ini_electrons]
@@ -111,7 +110,7 @@ class Parameters:
         self.delta_t = delta_t  # a.u.
         self.disc_spec = DiscretizationSpec(self.delta_t)
         self.asy_spec = AntisymmetrizationSpec(self.wfr_spec, self.antisym_method)
-        self.nuclei_data = [{"mass": 1680, "charge": 1, "pos": (self.x0/self.dq)}]
+        self.nuclei_data = [{"mass": 1680, "charge": 1, "pos": int(self.x0 / self.dq)}]
 
         if self.st_method == SUZUKI_TROTTER_QROM:
             self.rfq_spec = RfqPotentialSpec(
@@ -142,7 +141,15 @@ class Parameters:
         self.use_saved_data = use_saved_data
         self.stm_block = None
 
-        self.report = H1D1Report(outdir, "H1D1", self.wfr_spec, self.evo_spec)
+        self.report = H1D1Report(
+            outdir,
+            f"H1D1 {self.device} {self.st_method} {self.precision} {self.n1}b {self.delta_t:.3f}",
+            num_coordinate_bits=n1,
+            space_length=self.L,
+            delta_t=delta_t,
+            num_elec_iters=num_elec_iters,
+            num_nucl_iters=num_nucl_iters,
+        )
 
     def draw_circuits(self):
 
@@ -169,8 +176,8 @@ class Parameters:
 
         # draw the circuit
 
-        if self.use_motion_block_gates:
-            emb = stm_block.build_electron_motion_block(sim_time = 0)
+        if self.st_method == SUZUKI_TROTTER_QROM:
+            emb = stm_block.build_electron_motion_block(sim_time=0)
             self.report.add_circuit_diagram(emb.circuit, "elec_motion")
 
             epbq = emb.build_elec_potential_block_qrom()
@@ -256,42 +263,48 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="time_evo_h1", description="Time evolution of H atom"
     )
-    parser.add_argument("--device", type=str, default="CPU")
-    parser.add_argument("--enable-cuStateVec", type=str, default="False")
-    parser.add_argument("--dim", type=int, default=1)
-    parser.add_argument("--precision", type=str, default="single")
-    parser.add_argument("--bits", type=int, default=5)
-    parser.add_argument("--num-nucl-iters", type=int, default=1)
-    parser.add_argument("--num-elec-iters", type=int, default=1)
+    parser.add_argument("--device", type=str, choices=["CPU", "GPU"], required=True)
+    parser.add_argument(
+        "--enable-cuStateVec", type=str, choices=["True", "False"], required=True
+    )
+    parser.add_argument(
+        "--precision", type=str, choices=["double", "single"], required=True
+    )
+    parser.add_argument("--bits", type=int, required=True)
+    parser.add_argument("--num-nucl-iters", type=int, required=True)
+    parser.add_argument("--num-elec-iters", type=int, required=True)
     parser.add_argument(
         "--st-method",
         type=str,
-        default=SUZUKI_TROTTER_ARITHMETIC,
         choices=[SUZUKI_TROTTER_ARITHMETIC, SUZUKI_TROTTER_QROM],
+        required=True
     )
-    parser.add_argument("--use-saved-data", type=str, default="False")
-    parser.add_argument("--delta-t", type=float, default=0.001)
+    parser.add_argument("--use-saved-data", type=str, required=True)
+    parser.add_argument("--delta-t", type=float, required=True)
     args = parser.parse_args()
 
     use_cuStateVec = "cuStateVec" if args.enable_cuStateVec == "True" else "statevector"
 
-    tag = f"{args.device}_{use_cuStateVec}_{args.st_method}_{args.dim}D_{args.precision}_{args.bits}b_dt{args.delta_t}"
+    tag = f"{args.device}_{use_cuStateVec}_{args.st_method}_1D_{args.precision}_{args.bits}b_dt{args.delta_t:.3f}"
 
     outdir = "output/" + tag
     os.makedirs(outdir, exist_ok=True)
+    logfilename = outdir + f"/time_evo_h1_{args.st_method}.log"
+    if os.path.exists(logfilename):
+        os.truncate(logfilename, 0)
     logging.basicConfig(
         format="%(asctime)s %(levelname)-8s [%(name)s] %(message)s",
-        filename=outdir + "/time_evo_h1.log",
+        filename=logfilename,
         encoding="utf-8",
         level=logging.WARNING,
         datefmt="%Y-%m-%d %H:%M:%S",
     )
     logging.getLogger("crsq").setLevel(logging.INFO)
     logger.setLevel(logging.INFO)
+    print("Log file: ", logfilename)
 
     logger.info("Device : %s", args.device)
     logger.info("enable_cuStateVec : %s", args.enable_cuStateVec)
-    logger.info("Dimension : %s", args.dim)
     logger.info("Precision : %s", args.precision)
     logger.info("delta_t : %f", args.delta_t)
     logger.info("num nucl iters : %d", args.num_nucl_iters)
@@ -304,7 +317,6 @@ if __name__ == "__main__":
         outdir,
         args.device,
         args.enable_cuStateVec == "True",
-        args.dim,
         args.precision,
         args.delta_t,
         args.bits,

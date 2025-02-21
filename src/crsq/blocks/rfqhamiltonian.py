@@ -255,10 +255,10 @@ class RfqElectronPotentialBlock(heap.Frame):
                 scope: ast.Scope = ast.new_scope(self)
                 exr = scope.register(self._eregs[ie][0], signed=True)
                 ndata = nuclei_data[num_moving_nuclei + ia]
-                pos = ndata["pos"]
-                if not (pos == 0):
+                x0 = ndata["pos"]
+                if not (x0 == 0):
                     axc = scope.constant(
-                        int(pos / wfr_spec.delta_q),
+                        x0,
                         wfr_spec.num_coordinate_bits,
                         signed=True,
                     )

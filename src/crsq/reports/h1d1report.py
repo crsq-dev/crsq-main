@@ -21,21 +21,21 @@ class H1D1Report:
         self,
         outdir: str,
         title: str,
-        wfr_spec: wave_function.WaveFunctionRegisterSpec,
-        evo_spec: time_evolution.TimeEvolutionSpec
+        num_coordinate_bits: int,
+        space_length: float,
+        delta_t: float,
+        num_elec_iters: int,
+        num_nucl_iters: int
     ):
-        if wfr_spec.dimension != 1:
-            raise ValueError("This report is for 1D wave functions only")
         self.outdir = outdir
         self._title = title
-        self._wfr_spec = wfr_spec
-        self._evo_spec = evo_spec
-        self._n1 = wfr_spec.num_coordinate_bits
+        self._n1 = num_coordinate_bits
         self._M = 1 << self._n1
-        self._L = wfr_spec.space_length
-        self._dq = wfr_spec.delta_q
-        self._num_elec_iters = evo_spec.num_elec_per_atom_iterations
-        self._num_nucl_iters = evo_spec.num_atom_iterations
+        self._L = space_length
+        self._dq = space_length / self._M
+        self._delta_t = delta_t
+        self._num_elec_iters = num_elec_iters
+        self._num_nucl_iters = num_nucl_iters
         self._x = np.linspace(-self._L / 2, (self._L / 2) - self._dq, self._M)
 
     def add_circuit_diagram(self, circuit: QuantumCircuit, block_name: str):
@@ -47,11 +47,12 @@ class H1D1Report:
     def open_figure(self):
         """Start a plot"""
         self._fig, self._axs = plt.subplots(3, 1, figsize=(6, 12))
+        self._fig.suptitle(self._title)
         self._axs[0].set_title("abs")
         self._axs[1].set_title("real")
         self._axs[2].set_title("imag")
 
-    def add_wave_function_plot(self, time: float, y: npt.NDArray[np.complex128]):
+    def  add_wave_function_plot(self, time: float, y: npt.NDArray[np.complex128]):
         """Add a statevector to the report"""
         ab = np.abs(y) / math.sqrt(self._dq)
         re = np.real(y) / math.sqrt(self._dq)

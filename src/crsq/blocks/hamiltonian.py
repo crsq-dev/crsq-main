@@ -293,14 +293,14 @@ class ElectronPotentialBlock(PotentialBlockBase):
             for d in range(dim):
                 pos = ndata["pos"]  # tuple or float
                 if dim == 1:
-                    q_d = pos
+                    x_d = pos
                 elif isinstance(pos, tuple):
-                    q_d = pos[d]
+                    x_d = pos[d]
                 else:
                     raise ValueError("pos is not tuple")
-                logger.info("q_d = %f", q_d)
-                scaled_q_d = int(q_d * 2)
-                dims.append(ext_scope.constant(scaled_q_d, n + 1, 1, signed=True))
+                logger.info(f"stationary atom x_{d} = {x_d}")
+                scaled_x_d = int(x_d * 2)
+                dims.append(ext_scope.constant(scaled_x_d, n + 1, 1, signed=True))
             ast_nregs.append(dims)
 
         self._build_elec_elec_potential_terms_optimized(ext_scope, ast_eregs)
