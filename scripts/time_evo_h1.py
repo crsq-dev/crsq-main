@@ -16,10 +16,11 @@ from crsq.blocks.time_evolution.spec import (
 from crsq.blocks.wave_function import WaveFunctionRegisterSpec
 from crsq.blocks.time_evolution.suzuki_trotter import SuzukiTrotterMethodBlock
 from crsq.reports import H1D1Report
+import crsq.utils.statevector as svec
 
 from qiskit_aer import AerSimulator
 from qiskit import transpile
-import crsq.utils.statevector as svec
+from qiskit.quantum_info import Statevector
 
 import logging
 
@@ -45,17 +46,17 @@ def hydrogen1d_psi(xa: np.ndarray, x0: float, N: int):
 def elec_proton_potential(r: float) -> float:
     if r == 0:
         raise ValueError("r == 0")
-    return -1 / r
+    qq = -1 * 1
+    return qq / r
 
 
 def elec_elec_potential(r: float) -> float:
     if r == 0:
         raise ValueError("r == 0")
-    return 1 / r
-
+    qq = -1 * -1
+    return qq / r
 
 # build the simulator
-
 
 class Parameters:
     def __init__(
@@ -124,7 +125,8 @@ class Parameters:
             self.use_motion_block_gates = True
         else:
             self.rfq_spec = None
-            self.use_motion_block_gates = False
+            # self.use_motion_block_gates = False
+            self.use_motion_block_gates = True
 
         self.ham_spec = HamiltonianSpec(self.wfr_spec, nuclei_data=self.nuclei_data)
 
@@ -145,6 +147,7 @@ class Parameters:
             outdir,
             f"H1D1 {self.device} {self.st_method} {self.precision} {self.n1}b {self.delta_t:.3f}",
             num_coordinate_bits=n1,
+            psi_axis_scale=0.6,
             space_length=self.L,
             delta_t=delta_t,
             num_elec_iters=num_elec_iters,
@@ -208,25 +211,29 @@ class Parameters:
         circ = self.stm_block.circuit
         logger.info("transpile START")
         transpiled = transpile(circ, backend)
+        total_global_phase = transpiled.global_phase
+        logger.info("accumulated global phase of the circuit: %f", total_global_phase)
         logger.info("transpile END, run START")
         results = backend.run(transpiled).result()
         logger.info("run END")
         dt = self.disc_spec.delta_t
         t = 0
         for _nucl_it in range(self.num_nucl_iters):
+            # phase = total_global_phase * (_nucl_it + 1)/self.num_nucl_iters
+            phase = total_global_phase
             t += dt * self.evo_spec.num_elec_per_atom_iterations
-            self._save_result_sv(results, t)
+            self._save_result_sv(results, t, phase)
 
-    def _save_result_sv(self, results, t):
+    def _save_result_sv(self, results, t, global_phase):
         label = self.evo_spec.make_state_vector_label(t)
-        sv = results.data()[label]
-        fname = self.outdir + "/" + self.evo_spec.make_state_vector_file_name(t)
-        logger.info("Saving to : %s", fname)
-        svec.save_to_file(fname, sv, eps=1e-12)
+        sv: Statevector = results.data()[label]
+        logger.info("global phase at t=%f: %f", t, global_phase)
+        phase_adjusted_data = sv.data * np.exp(-1j * global_phase)
+        self.report.add_state_vector_file(t, sv.dim, phase_adjusted_data)
 
     def draw_graph(self):
         """draw the graph based on the results file."""
-        self.report.open_figure()
+        self.report.open_report()
 
         dt = self.disc_spec.delta_t
         t = 0
@@ -234,16 +241,12 @@ class Parameters:
             t += dt * self.evo_spec.num_elec_per_atom_iterations
             self._add_plot(t)
 
-        self.report.generate_figure()
+        self.report.generate_report()
 
     def _add_plot(self, time):
-        fname = self.outdir + "/" + self.evo_spec.make_state_vector_file_name(time)
-        logger.info("Reading: %s", fname)
         qc = self.stm_block.circuit
-        sv = svec.read_from_file(fname)
-        data = svec.extract_dist(qc, sv, "e0x", eps=1e-12)
-        norm = np.linalg.norm(data)
-        logger.info("norm(t=%d)=%f", time, norm)
+        bit_range = svec.get_bit_range_for_reg(qc, "e0x")
+        data = self.report.read_state_vector_file(time, bit_range)
         self.report.add_wave_function_plot(time, data)
 
 
@@ -285,7 +288,7 @@ if __name__ == "__main__":
 
     use_cuStateVec = "cuStateVec" if args.enable_cuStateVec == "True" else "statevector"
 
-    tag = f"{args.device}_{use_cuStateVec}_{args.st_method}_1D_{args.precision}_{args.bits}b_dt{args.delta_t:.3f}"
+    tag = f"{args.device}_{use_cuStateVec}_{args.st_method}_1D_{args.precision}_{args.bits}b_dt{args.delta_t:.3f}/{args.num_nucl_iters}n.{args.num_elec_iters}e"
 
     outdir = "output/" + tag
     os.makedirs(outdir, exist_ok=True)
