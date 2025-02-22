@@ -5,6 +5,7 @@ import re
 import math
 import cmath
 import numpy as np
+import numpy.typing as npt
 from qiskit.circuit import Qubit, QuantumRegister, QuantumCircuit
 from qiskit.quantum_info import Statevector
 import crsq.utils.amplitudes as amp
@@ -12,15 +13,18 @@ import crsq_arithmetic.ast as ast
 import crsq_heap.heap as heap
 
 def save_to_file(path: str, sv: Statevector, eps=1.0e-10):
+    save_svdata_to_file(str, sv.dim, sv.data, eps)
+
+def save_svdata_to_file(path: str, svdim: int, svdata: list[complex], eps=1.0e-10):
     """ Save components of a statevector to a file
     """
     nan_was_detected = False
     with open(path, "w", encoding="utf-8") as f:
-        d = int(math.log2(sv.dim))
+        d = int(math.log2(svdim))
         f.write(f"{d}\n")
-        n = len(sv.data)
+        n = len(svdata)
         f.write(f"{n}\n")
-        for i, z in enumerate(sv.data):
+        for i, z in enumerate(svdata):
             if abs(z) > eps:
                 key = bin((1<<d) + i)[-d:]
                 f.write(f"{key},{z.real},{z.imag}\n")
@@ -145,6 +149,15 @@ def extract_dist2d_from_file_sub(path: str, xfrom: int, xto: int, yfrom: int, yt
             dists[xval, yval] = dists[xval,yval] + z
     return dists
 
+def get_bit_range_for_reg(qc: QuantumCircuit, reg_name: str) -> tuple[int]:
+    """ Get the bit range for a register
+    """
+    reg_map = {}
+    acc = 0
+    for reg in qc.qregs:
+        reg_map[reg.name] = (acc, acc + reg.size)
+        acc += reg.size
+    return reg_map[reg_name]
 
 def extract_dist(qc: QuantumCircuit, sv: Statevector, data_reg: str, eps=1.0e-12) -> np.ndarray:
     """ make a 2-d array indexed by group_reg, data_reg
