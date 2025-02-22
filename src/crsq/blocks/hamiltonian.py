@@ -143,7 +143,7 @@ class PotentialBlockBase(heap.Frame):
         self._diff_zero_ancilla_reg: QuantumRegister
         self._diff_stash_reg: QuantumRegister
 
-    def _rotate_phase_by_ast(self, quotient: ast.QuantumValue, charge: float):
+    def _rotate_phase_by_ast(self, quotient: ast.QuantumValue, charge2: float):
         reg = quotient.register
         frac_bits = quotient.fraction_bits
         qc = self.circuit
@@ -151,8 +151,9 @@ class PotentialBlockBase(heap.Frame):
         delta_q = self._wfr_spec.delta_q
         for i in range(reg.size):
             digit_weight = 2 ** (i - frac_bits)
-            eta = charge * delta_t / delta_q
+            eta = charge2 * delta_t / delta_q
             qc.p(-eta * digit_weight, reg[i])
+            logger.info(f"P({i}) : charge2={charge2} eta={eta} dtheta={-eta * digit_weight}")
 
     def _allocate_singularity_exchange_registers(self):
         if not self._ham_spec.should_mask_potential_singularity:
