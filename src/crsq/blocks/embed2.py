@@ -1,7 +1,7 @@
 """ state preparation gates (unary iteration using ancilla qubits)
 """
 
-from typing import List
+from typing import List, Tuple
 import math
 import cmath
 import time
@@ -12,6 +12,19 @@ from crsq_heap.heap import Frame, Binding
 
 logger = logging.getLogger(__name__)
 LOG_TIME_THRESH=1
+
+def fix_polar(p: Tuple[float, float])-> Tuple[float, float]:
+    """ fix polar form """
+    if p[1] >= math.pi/2:
+        return (-p[0], p[1]-math.pi)
+    elif p[1] <= -math.pi/2:
+        return (-p[0], p[1]+math.pi)
+    else:
+        return p
+
+def to_fixed_polar(data: List[complex])-> List[Tuple[float, float]]:
+    """ to fixed polar form """
+    return [fix_polar(cmath.polar(x)) for x in data]
 
 class StateEmbedGate2(Frame):
     """ State embedding gate
@@ -46,8 +59,11 @@ class StateEmbedGate2(Frame):
     def build_circuit(self):
         """ build """
         logger.info("start: StateEmbedGate2.build()")
-        norms = self.build_norm_tree()
-        phases = self.build_phase_tree()
+        pdata = to_fixed_polar(self._data)
+        # norms = self.build_norm_tree()
+        # phases = self.build_phase_tree()
+        norms = self.build_norm_tree_from_polar(pdata)
+        phases = self.build_phase_tree_from_polar(pdata)
         n = self._num_bits
         qc = self.circuit
 
@@ -91,6 +107,31 @@ class StateEmbedGate2(Frame):
 
     def build_phase_tree(self):
         avg0 = [(cmath.phase(x),) for x in self._data]
+        print("avg0", [tpl[0]/math.pi for tpl in avg0])
+        while len(avg0) >= 4:
+            avg1 = []
+            for j in range(len(avg0)//2):
+                phi0 = avg0[2*j][0]
+                phi1 = avg0[2*j+1][0]
+                avg = (phi0 + phi1)/2
+                avg1.append((avg, (avg0[2*j], avg0[2*j+1])))
+            avg0 = avg1
+        return avg0
+
+    def build_norm_tree_from_polar(self, pdata):
+        norm0 = [(p[0],) for p in pdata]
+        while len(norm0) >= 4:
+            norm1 = []
+            for j in range(len(norm0)//2):
+                s0 = norm0[2*j][0]
+                s1 = norm0[2*j+1][0]
+                s = math.sqrt(s0*s0 + s1*s1)
+                norm1.append((s, (norm0[2*j], norm0[2*j+1])))
+            norm0 = norm1
+        return norm0
+
+    def build_phase_tree_from_polar(self, pdata):
+        avg0 = [(p[1],) for p in pdata]
         print("avg0", [tpl[0]/math.pi for tpl in avg0])
         while len(avg0) >= 4:
             avg1 = []
