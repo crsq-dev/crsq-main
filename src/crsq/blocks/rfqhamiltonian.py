@@ -263,6 +263,8 @@ class RfqElectronPotentialBlock(heap.Frame):
                         signed=True,
                     )
                     exr -= axc
+                # we don't need abs here because the qrom has
+                # data for inputs in [-M/2, M/2)
                 scope.build_circuit()
 
                 self._apply_radial_func_qrom_1d(exr, self._elec_nucl_phase_shift)
