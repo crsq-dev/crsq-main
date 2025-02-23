@@ -67,8 +67,6 @@ def extract_grouped_dist(sv: Statevector, group_from: int, group_to: int,
         group_index = (k & groups_bitmask) >> group_from
         data_index = (k & data_bitmask) >> data_from
         dists[group_index, data_index] += z
-        if z > 0.1:
-            print(f"dists[{group_index},{data_index}]+={z}")
     return dists
 
 
