@@ -223,26 +223,9 @@ class ElectronPotentialBlock(PotentialBlockBase):
         n = wfr_spec.num_coordinate_bits
         m = self._ham_spec.num_v_numerator_int_bits
         self._vx_const_numerator_reg = QuantumRegister(n + m, "one")
-        self._allocate_lsb_bits()
         self.add_local(self._vx_const_numerator_reg)
         self._allocate_singularity_exchange_registers()
 
-    def _allocate_lsb_bits(self):
-        """reserve extra bits to be added as the 2^-1 weight digit for coordinates"""
-        wfr_spec = self._wfr_spec
-        if wfr_spec.num_electrons > 1:
-            num_elec_lsb = 2
-        else:
-            num_elec_lsb = 1
-        self._ereg_lsbs = [
-            QuantumRegister(wfr_spec.dimension, f"elec_lsb{ie}") for ie in range(num_elec_lsb)
-        ]
-        self.add_local(("ereg_lsbs", self._ereg_lsbs))
-        if wfr_spec.num_moving_nuclei > 0:
-            self._nreg_lsbs = [
-                QuantumRegister(wfr_spec.dimension, f"nucl_lsb{ia}") for ia in range(2)
-            ]
-            self.add_local(("nreg_lsbs", self._nreg_lsbs))
 
     def build_circuits(self):
         if self._ham_spec.should_use_div_bits_optimization:
@@ -300,8 +283,7 @@ class ElectronPotentialBlock(PotentialBlockBase):
                 else:
                     raise ValueError("pos is not tuple")
                 logger.info(f"stationary atom x_{d} = {x_d}")
-                scaled_x_d = int(x_d * 2)
-                dims.append(ext_scope.constant(scaled_x_d, n + 1, 1, signed=True))
+                dims.append(ext_scope.constant(x_d, n, signed=True))
             ast_nregs.append(dims)
 
         self._build_elec_elec_potential_terms_optimized(ext_scope, ast_eregs)
@@ -395,9 +377,7 @@ class ElectronPotentialBlock(PotentialBlockBase):
                 ast_dist: ast.QuantumValue
                 if wfr_spec.dimension == 1:
                     ast_e = ast_eregs[ie][0]
-                    ast_h = ast_eregs[ih][0].adjust_precision(
-                        n + 1, 1, None, [self._ereg_lsbs[1][0]]
-                    )
+                    ast_h = ast_eregs[ih][0]
                     ast_e -= ast_h  # diff
                     ast_dist = ex_scope.abs(ast_e)
                 else:
@@ -560,27 +540,14 @@ class ElectronPotentialBlock(PotentialBlockBase):
                 ast_dist: ast.QuantumValue
                 if wfr_spec.dimension == 1:
                     ast_e = ast_eregs[ie][0]
-                    ast_e = ast_e.adjust_precision(
-                        n + 1, 1, None, [self._ereg_lsbs[0][0]]
-                    )
                     ast_n = ast_nregs[ia][0]
-                    if ia < wfr_spec.num_moving_nuclei:
-                        ast_n = ast_n.adjust_precision(
-                            n + 1, 1, None, [self._nreg_lsbs[0][0]]
-                        )
                     ast_e -= ast_n  # diff
                     ast_dist = ex_scope.abs(ast_e)
                 else:
                     ast_squares = []
                     for d in range(wfr_spec.dimension):
                         ast_e = ast_eregs[ie][d]
-                        ast_e = ast_e.adjust_precision(
-                            n + 1, 1, None, [self._ereg_lsbs[0][d]]
-                        )
                         ast_n = ast_nregs[ia][d]
-                        ast_n = ast_n.adjust_precision(
-                            n + 1, 1, None, [self._nreg_lsbs[0][d]]
-                        )
                         ast_e -= ast_n  # diff
                         ast_sq = ex_scope.square(ast_e)
                         ast_squares.append(ast_sq)
