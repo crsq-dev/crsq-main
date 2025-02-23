@@ -199,7 +199,7 @@ class RadialFuncGrayCodeQrom1d(Frame):
             if r == 0:
                 r = self._dq/2
             psi = self._rfunc(r)
-            logger.info("i=%d, q=%f, r=%f, psi=%f", i, q, r, psi)
+            # logger.info("i=%d, q=%f, r=%f, psi=%f", i, q, r, psi)
             if abs(psi) > math.pi:
                 logger.warning("large value of |psi| at x=%f, r=%f, psi=%f", si, r, psi)
             self._data[i] = -2.0 * psi
