@@ -243,7 +243,7 @@ class RfqElectronPotentialBlock(heap.Frame):
             raise NotImplementedError("Dimension > 2 is not implemented yet.")
 
     def _build_elec_nucl_potential_terms_1d(self):
-        logger.info("_build_elec_nucl_potential_terms_1d: skipping")
+        logger.info("_build_elec_nucl_potential_terms_1d:")
         wfr_spec = self._wfr_spec
         ham_spec = self._ham_spec
         nuclei_data = ham_spec.nuclei_data
