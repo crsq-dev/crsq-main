@@ -6,7 +6,7 @@ import ffmpeg
 import os;
 import glob
 
-from typing import Tuple
+from typing import Tuple, Callable
 
 import math
 
@@ -30,6 +30,7 @@ class H1D1Report:
         num_coordinate_bits: int,
         psi_axis_scale: float,
         space_length: float,
+        hp_func: Callable[[float], float],
         delta_t: float,
         num_elec_iters: int,
         num_nucl_iters: int
@@ -41,6 +42,7 @@ class H1D1Report:
         self._M = 1 << self._n1
         self._WM = self._M // 2
         self._L = space_length
+        self._hp_func = hp_func
         self._dq = self._L / self._M
         self._psi_axis_scale = psi_axis_scale
         self._dq = space_length / self._M
@@ -50,9 +52,16 @@ class H1D1Report:
         self._num_nucl_iters = num_nucl_iters
         self._xv = np.linspace(0, self._M-1, self._M)
         self._qv = self._xv * self._dq
+        # potential energy function
+        self._hpv = np.ndarray(self._M, np.float64)
+        for x in range(self._M):
+            self._hpv[x] = self._hp_func(x * self._dq)
         self._kv = np.concatenate([np.linspace(0, self._M/2-1, self._M//2), np.linspace(-self._M/2, -1, self._M//2)])
         self._dp = 2*math.pi/self._L
         self._pv = self._kv * self._dp
+        me = 1.0
+        # kinetic energy function
+        self._hkv = np.square(self._pv)/(2.0*me)
         self._prepare_dir()
 
     def _prepare_dir(self) -> None:
@@ -80,6 +89,9 @@ class H1D1Report:
         self._axs[1].set_ylim(-self._psi_axis_scale, self._psi_axis_scale)
         self._axs[2].set_title("imag")
         self._axs[2].set_ylim(-self._psi_axis_scale, self._psi_axis_scale)
+        self._trace_time = []
+        self._hk_trace = []
+        self._hp_trace = []
     
     def add_q_state_vector_file(self, t: float, svdim: int, svdata):
         """Add a q-space statevector to the report"""
@@ -121,6 +133,36 @@ class H1D1Report:
         self._axs[2].plot(self._qv, im, label=f"t={time:4.3f}")
         """ add a frame for the video """
         self._produce_video_frame(time, self._T, q_data, p_data)
+    
+    def record_energy(self, t, q_data, p_data):
+        Hk = np.sum(
+            np.abs(p_data * np.conjugate(p_data)) * self._hkv
+        ).item()
+        Hp = np.sum(
+            np.abs(q_data * np.conjugate(q_data)) * self._hpv
+        ).item()
+        self._trace_time.append(t)
+        self._hk_trace.append(Hk)
+        self._hp_trace.append(Hp)
+
+    def _plot_energy(self):
+        fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+        ax.set_title(f"M={self._M},L={self._L},T={self._T:6.3f},dt={self._delta_t}")
+        npt = np.array(self._trace_time)
+        nphk = np.array(self._hk_trace)
+        nphp = np.array(self._hp_trace)
+        nphtot = nphk + nphp
+        ax.grid(True)
+        ax.plot(npt, nphk, label="Hk(t)")
+        ax.plot(npt, nphp, label="Hp(t)")
+        ax.plot(npt, nphtot, label="Hk(t)+Hp(t)")
+        ax.set_xlabel("t (time)")
+        ax.set_ylabel("energy")
+        ax.legend()
+        filename = f"{self._outdir}/energy_trace.png"
+        print("writing to file : ", filename)
+        fig.savefig(fname=filename)
+        plt.close(fig)
 
     def _produce_video_frame(self, t: float, T, q_data, p_data):
         fig, axs = plt.subplots(3, 1, figsize=(8, 12), layout='constrained')
@@ -218,6 +260,10 @@ class H1D1Report:
         )
         plt.close(self._fig)
 
+        self._plot_energy()
+        self._produce_video()
+
+    def _produce_video(self):
         print("producing video : ", self.moviefile)
         stream = ffmpeg.input(f'{self._framesdir}/t_*.png', pattern_type='glob', framerate=8)
         ffmpeg.output(stream, self.moviefile, pix_fmt='yuv420p').run()
