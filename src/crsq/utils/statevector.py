@@ -94,8 +94,6 @@ def extract_dist_sub(sv: Statevector, data_from: int, data_to: int,
     for k, z in enumerate(sv.data):
         data_index = (k & data_bitmask) >> data_from
         dists[data_index] += z
-        if z > 0.1:
-            print(f"dists[{data_index}]+={z}")
     return dists
 
 def extract_dist2_sub(sv: Statevector, xfrom: int, xto: int,
