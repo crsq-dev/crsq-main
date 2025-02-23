@@ -19,13 +19,13 @@ class QFTOnWaveFunctionsBlock(heap.Frame):
     """ QFT application block"""
 
     def __init__(self, wfr_spec: wave_function.WaveFunctionRegisterSpec,
-                 on_electrons:bool = False, on_nucleus:bool = False,
+                 on_electrons:bool = False, on_nuclei:bool = False,
                  inverse: bool = False, build: bool = True):
         super().__init__()
         t1 = time.time()
         self._wfr_spec = wfr_spec
         self._on_electrons = on_electrons
-        self._on_nucleus = on_nucleus
+        self._on_nuclei = on_nuclei
         self._eregs: List[List[List[QuantumRegister]]] = []
         self._nregs: List[List[List[QuantumRegister]]] = []
         self._inverse = inverse
@@ -46,7 +46,7 @@ class QFTOnWaveFunctionsBlock(heap.Frame):
         if self._on_electrons:
             self._eregs = self._wfr_spec.allocate_elec_registers()
             self.add_param(('eregs', self._eregs))
-        if self._on_nucleus:
+        if self._on_nuclei:
             self._nregs = self._wfr_spec.allocate_nucl_registers()
             self.add_param(('nregs', self._nregs))
 
@@ -62,7 +62,7 @@ class QFTOnWaveFunctionsBlock(heap.Frame):
                 # and should be excluded from the QFT.
                 for d in range(wfr_spec.dimension):
                     qc.append(circuit_lib.QFT(num_bits, inverse=self._inverse), elec[d][:])
-        if self._on_nucleus:
+        if self._on_nuclei:
             for nuc in self._nregs:
                 for d in range(wfr_spec.dimension):
                     qc.append(circuit_lib.QFT(num_bits, inverse=self._inverse), nuc[d][:])
