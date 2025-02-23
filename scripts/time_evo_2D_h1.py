@@ -147,7 +147,7 @@ class Parameters:
             self.num_elec_iters,
             method=SUZUKI_TROTTER_QROM,
             rfq_spec=self.rfq_spec,
-            save_state_vector_per_atom_iteration=False  # False when we are just drawing
+            save_q_state_vector=False  # False when we are just drawing
         )
 
         self.stm_block = SuzukiTrotterMethodBlock(
@@ -189,8 +189,8 @@ class Parameters:
             self.num_elec_iters,
             method=SUZUKI_TROTTER_QROM,
             rfq_spec=self.rfq_spec,
-            save_state_vector_per_atom_iteration=self.save_state_vector_per_atom_iteration,  # True when we are running
-            save_state_vector_per_qft=False
+            save_q_state_vector=self.save_state_vector_per_atom_iteration,  # True when we are running
+            save_p_state_vector=False
         )
         stm = SuzukiTrotterMethodBlock(
             self.evo_spec, self.ene_spec, self.asy_spec, use_motion_block_gates=True)
@@ -211,7 +211,7 @@ class Parameters:
         suffixes = []
         if self.evo_spec.rfq_spec.should_save_state_vector_per_qrom:
             suffixes += ["_qrom0", "_qrom1"]
-        if self.evo_spec.should_save_state_vector_per_qft:
+        if self.evo_spec.should_save_p_state_vector:
             suffixes += ["_qftd1"]
         suffixes += [""]
         for suffix in suffixes:

@@ -20,8 +20,8 @@ class TimeEvolutionSpec:
                  num_elec_per_atom_iterations: int,
                  method: str = SUZUKI_TROTTER_ARITHMETIC,
                  rfq_spec: rfqhamiltonian.RfqPotentialSpec = None,
-                 save_state_vector_per_atom_iteration: bool = False,
-                 save_state_vector_per_qft: bool = False,
+                 save_q_state_vector: bool = False,
+                 save_p_state_vector: bool = False,
                  use_for_loop_gate: bool = False,
                  ):
         assert isinstance(ham_spec, hamiltonian.HamiltonianSpec)
@@ -38,8 +38,8 @@ class TimeEvolutionSpec:
         self._should_calculate_nucleus_motion = True
         self._should_calculate_potential_term = True
         self._should_calculate_kinetic_term = True
-        self._should_save_state_vector_per_atom_iteration = save_state_vector_per_atom_iteration
-        self._should_save_state_vector_per_qft = save_state_vector_per_qft
+        self._should_save_q_state_vector = save_q_state_vector
+        self._should_save_p_state_vector = save_p_state_vector
         self._should_apply_qft = True
         self._should_use_for_loop_gate = use_for_loop_gate
         valid_methods = [SUZUKI_TROTTER_ARITHMETIC, SUZUKI_TROTTER_QROM]
@@ -136,22 +136,22 @@ class TimeEvolutionSpec:
         return self._num_elec_per_atom_iterations
 
     @property
-    def should_save_state_vector_per_atom_iteration(self) -> bool:
+    def should_save_q_state_vector(self) -> bool:
         """ flag that tells state vector should be saved per atom iteration """
-        return self._should_save_state_vector_per_atom_iteration
+        return self._should_save_q_state_vector
     
     def make_state_vector_file_name(self, time: float, suffix = ""):
         """ make state vector file name """
         return f"state_vector_{time:04.3f}{suffix}.csv"
 
-    def make_state_vector_label(self, time: float, suffix = ""):
+    def make_state_vector_label(self, time: float, label = "sv"):
         """ make state vector label """
-        return f"sv_t{time:04.3f}{suffix}"
+        return f"{label}{time:04.3f}"
 
     @property
-    def should_save_state_vector_per_qft(self) -> bool:
+    def should_save_p_state_vector(self) -> bool:
         """ flag that tells state vector should be saved per qft """
-        return self._should_save_state_vector_per_qft
+        return self._should_save_p_state_vector
 
     @property
     def method(self):

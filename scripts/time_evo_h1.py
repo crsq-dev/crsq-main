@@ -113,6 +113,8 @@ class Parameters:
         self.asy_spec = AntisymmetrizationSpec(self.wfr_spec, self.antisym_method)
         self.nuclei_data = [{"mass": 1680, "charge": 1, "pos": int(self.x0 / self.dq)}]
 
+        self._make_reverse_bit_index()
+
         if self.st_method == SUZUKI_TROTTER_QROM:
             self.rfq_spec = RfqPotentialSpec(
                 self.wfr_spec,
@@ -137,7 +139,8 @@ class Parameters:
             self.num_elec_iters,
             self.st_method,
             self.rfq_spec,
-            save_state_vector_per_atom_iteration=True,
+            save_q_state_vector=True,
+            save_p_state_vector=True
         )
 
         self.use_saved_data = use_saved_data
@@ -154,6 +157,18 @@ class Parameters:
             num_nucl_iters=num_nucl_iters,
         )
 
+    def _make_reverse_bit_index(self):
+        self._reverse_bit_index = []
+        for i in range(self.M):
+            self._reverse_bit_index.append(Parameters.reverse_bits(i, self.n1))
+
+    def reverse_bits(value, num_bits):
+        result = 0
+        for i in range(num_bits):
+            if value & (1 << i):
+                result |= 1 << (num_bits - 1 - i)
+        return result
+
     def draw_circuits(self):
 
         evo_spec_for_draw = TimeEvolutionSpec(
@@ -163,7 +178,7 @@ class Parameters:
             self.num_elec_iters,
             self.st_method,
             self.rfq_spec,
-            save_state_vector_per_atom_iteration=False,
+            save_q_state_vector=False,
             use_for_loop_gate=True,
         )
 
@@ -186,7 +201,10 @@ class Parameters:
             epbq = emb.build_elec_potential_block_qrom()
             self.report.add_circuit_diagram(epbq.circuit, "elec_potential_qrom")
         else:
-            epot = stm_block.build_elec_potential_block()
+            emb = stm_block.build_electron_motion_block(sim_time=0)
+            self.report.add_circuit_diagram(emb.circuit, "elec_motion")
+
+            epot = emb.build_elec_potential_block_arithmetic()
             self.report.add_circuit_diagram(epot.circuit, "elec_potential")
 
     def run_circuit(self):
@@ -214,7 +232,11 @@ class Parameters:
         total_global_phase = transpiled.global_phase
         logger.info("accumulated global phase of the circuit: %f", total_global_phase)
         logger.info("transpile END, run START")
-        results = backend.run(transpiled).result()
+        result = backend.run(transpiled).result()
+        if (not result.success):
+            logger.error("simulation failed")
+            raise ValueError("simulation failed")
+            return
         logger.info("run END")
         dt = self.disc_spec.delta_t
         t = 0
@@ -222,14 +244,29 @@ class Parameters:
             # phase = total_global_phase * (_nucl_it + 1)/self.num_nucl_iters
             phase = total_global_phase
             t += dt * self.evo_spec.num_elec_per_atom_iterations
-            self._save_result_sv(results, t, phase)
+            self._save_result_sv(result, t, phase)
 
-    def _save_result_sv(self, results, t, global_phase):
-        label = self.evo_spec.make_state_vector_label(t)
-        sv: Statevector = results.data()[label]
+    def _save_result_sv(self, result, t, global_phase):
         logger.info("global phase at t=%f: %f", t, global_phase)
-        phase_adjusted_data = sv.data * np.exp(-1j * global_phase)
-        self.report.add_state_vector_file(t, sv.dim, phase_adjusted_data)
+        q_state_label = self.evo_spec.make_state_vector_label(t)
+        qsv: Statevector = result.data()[q_state_label]
+        phase_adjusted_qdata = qsv.data * np.exp(-1j * global_phase)
+        self.report.add_q_state_vector_file(t, qsv.dim, phase_adjusted_qdata)
+        p_state_label = self.evo_spec.make_state_vector_label(t, "qft")
+        psv: Statevector = result.data()[p_state_label]
+        phase_adjusted_pdata = psv.data * np.exp(-1j * global_phase)
+        reordered_data = self._reverse_electron_bits(phase_adjusted_pdata)
+        self.report.add_p_state_vector_file(t, psv.dim, reordered_data)
+
+    def _reverse_electron_bits(self, data):
+        qc = self.stm_block.circuit
+        n1 = self.wfr_spec.num_coordinate_bits
+        M = 1 << n1
+        result = np.zeros(M, dtype=np.complex128)
+        for i in range(M):
+            j = self._reverse_bit_index[i]
+            result[j] = data[i]
+        return result
 
     def draw_graph(self):
         """draw the graph based on the results file."""
@@ -246,8 +283,9 @@ class Parameters:
     def _add_plot(self, time):
         qc = self.stm_block.circuit
         bit_range = svec.get_bit_range_for_reg(qc, "e0x")
-        data = self.report.read_state_vector_file(time, bit_range)
-        self.report.add_wave_function_plot(time, data)
+        q_data = self.report.read_q_state_vector_file(time, bit_range)
+        p_data = self.report.read_p_state_vector_file(time, bit_range)
+        self.report.add_wave_function_plot(time, q_data, p_data)
 
 
 def run_experiment(par: Parameters, tag: str):

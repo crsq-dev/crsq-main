@@ -122,7 +122,7 @@ class Parameters:
             self.disc_spec,
             self.num_nucl_iters,
             self.num_elec_iters,
-            save_state_vector_per_atom_iteration=False,
+            save_q_state_vector=False,
         )
 
         self.stm_block = SuzukiTrotterMethodBlock(
@@ -157,7 +157,7 @@ class Parameters:
             self.disc_spec,
             self.num_nucl_iters,
             self.num_elec_iters,
-            save_state_vector_per_atom_iteration=True,
+            save_q_state_vector=True,
         )
         stm = SuzukiTrotterMethodBlock(evo_spec, self.ene_spec, self.asy_spec)
 
