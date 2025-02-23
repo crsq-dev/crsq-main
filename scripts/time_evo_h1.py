@@ -146,10 +146,19 @@ class Parameters:
         self.use_saved_data = use_saved_data
         self.stm_block = None
 
+        def hp_func(q: float) -> float:
+            r = np.abs(q - self.x0)
+            if r == 0:
+                invr = 2/self.dq
+            else:
+                invr = 1/r
+            return -1 * invr
+
         self.report = H1D1Report(
             outdir,
             f"H1D1 {self.device} {self.st_method} {self.precision} {self.n1}b {self.delta_t:.3f}",
             num_coordinate_bits=n1,
+            hp_func=hp_func,
             psi_axis_scale=0.6,
             space_length=self.L,
             delta_t=delta_t,
@@ -286,6 +295,7 @@ class Parameters:
         q_data = self.report.read_q_state_vector_file(time, bit_range)
         p_data = self.report.read_p_state_vector_file(time, bit_range)
         self.report.add_wave_function_plot(time, q_data, p_data)
+        self.report.record_energy(time, q_data, p_data)
 
 
 def run_experiment(par: Parameters, tag: str):
