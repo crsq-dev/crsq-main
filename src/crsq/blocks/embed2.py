@@ -60,8 +60,6 @@ class StateEmbedGate2(Frame):
         """ build """
         logger.info("start: StateEmbedGate2.build()")
         pdata = to_fixed_polar(self._data)
-        # norms = self.build_norm_tree()
-        # phases = self.build_phase_tree()
         norms = self.build_norm_tree_from_polar(pdata)
         phases = self.build_phase_tree_from_polar(pdata)
         n = self._num_bits
@@ -74,7 +72,6 @@ class StateEmbedGate2(Frame):
         avg0 = phases[0][0]
         avg1 = phases[1][0]
         phi = avg1 - avg0
-        logger.info("avg_phase = %f", (avg1 + avg0)/2)
 
         bit = n - 1
         if theta == math.pi:
@@ -92,32 +89,6 @@ class StateEmbedGate2(Frame):
             self.build_structure_for_bit(bit-1, norms[1][1], phases[1][1])
             qc.cx(self._qreg[bit], self._work[bit-1])
 
-
-    def build_norm_tree(self):
-        norm0 = [(abs(x),) for x in self._data]
-        while len(norm0) >= 4:
-            norm1 = []
-            for j in range(len(norm0)//2):
-                s0 = norm0[2*j][0]
-                s1 = norm0[2*j+1][0]
-                s = math.sqrt(s0*s0 + s1*s1)
-                norm1.append((s, (norm0[2*j], norm0[2*j+1])))
-            norm0 = norm1
-        return norm0
-
-    def build_phase_tree(self):
-        avg0 = [(cmath.phase(x),) for x in self._data]
-        print("avg0", [tpl[0]/math.pi for tpl in avg0])
-        while len(avg0) >= 4:
-            avg1 = []
-            for j in range(len(avg0)//2):
-                phi0 = avg0[2*j][0]
-                phi1 = avg0[2*j+1][0]
-                avg = (phi0 + phi1)/2
-                avg1.append((avg, (avg0[2*j], avg0[2*j+1])))
-            avg0 = avg1
-        return avg0
-
     def build_norm_tree_from_polar(self, pdata):
         norm0 = [(p[0],) for p in pdata]
         while len(norm0) >= 4:
@@ -132,7 +103,6 @@ class StateEmbedGate2(Frame):
 
     def build_phase_tree_from_polar(self, pdata):
         avg0 = [(p[1],) for p in pdata]
-        print("avg0", [tpl[0]/math.pi for tpl in avg0])
         while len(avg0) >= 4:
             avg1 = []
             for j in range(len(avg0)//2):
