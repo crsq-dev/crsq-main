@@ -2,6 +2,9 @@
 from qiskit import QuantumCircuit
 import numpy as np
 import numpy.typing as npt
+import ffmpeg
+import os;
+import glob
 
 from typing import Tuple
 
@@ -31,7 +34,8 @@ class H1D1Report:
         num_elec_iters: int,
         num_nucl_iters: int
     ):
-        self.outdir = outdir
+        self._outdir = outdir
+        self._framesdir = outdir + "/frames"
         self._title = title
         self._n1 = num_coordinate_bits
         self._M = 1 << self._n1
@@ -49,10 +53,20 @@ class H1D1Report:
         self._kv = np.concatenate([np.linspace(0, self._M/2-1, self._M//2), np.linspace(-self._M/2, -1, self._M//2)])
         self._dp = 2*math.pi/self._L
         self._pv = self._kv * self._dp
+        self._prepare_dir()
+
+    def _prepare_dir(self) -> None:
+        dirname = self._framesdir
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+        for f in glob.glob(f'{dirname}/t_*.png'):
+            os.remove(f)
+        if os.path.exists(self.moviefile):
+            os.remove(self.moviefile)
 
     def add_circuit_diagram(self, circuit: QuantumCircuit, block_name: str):
         """Add a circuit diagram to the report"""
-        fname = f"{self.outdir}/{block_name}.png"
+        fname = f"{self._outdir}/{block_name}.png"
         logger.info(f"Saving circuit diagram of {block_name} to {fname}")
         circuit.draw(output="mpl", filename=fname, scale=0.6, fold=100)
 
@@ -69,18 +83,18 @@ class H1D1Report:
     
     def add_q_state_vector_file(self, t: float, svdim: int, svdata):
         """Add a q-space statevector to the report"""
-        fname = self.outdir + "/" + f"state_vector_{t:04.3f}_q.csv"
+        fname = self._framesdir + "/" + f"state_vector_{t:04.3f}_q.csv"
         logger.info("Saving to : %s", fname)
         svec.save_svdata_to_file(fname, svdim, svdata, eps=1e-12)
     
     def add_p_state_vector_file(self, t: float, svdim: int, svdata):
         """Add a p-space statevector to the report"""
-        fname = self.outdir + "/" + f"state_vector_{t:04.3f}_p.csv"
+        fname = self._framesdir + "/" + f"state_vector_{t:04.3f}_p.csv"
         logger.info("Saving to : %s", fname)
         svec.save_svdata_to_file(fname, svdim, svdata, eps=1e-12)
     
     def read_q_state_vector_file(self, t: float, bit_range: Tuple[int, int]):
-        fname = self.outdir + "/" + f"state_vector_{t:04.3f}_q.csv"
+        fname = self._framesdir + "/" + f"state_vector_{t:04.3f}_q.csv"
         logger.info("Reading: %s", fname)
         sv = svec.read_from_file(fname)
         data = svec.extract_dist_sub(sv, bit_range[0], bit_range[1], eps=1e-12)
@@ -89,7 +103,7 @@ class H1D1Report:
         return data
     
     def read_p_state_vector_file(self, t: float, bit_range: Tuple[int, int]):
-        fname = self.outdir + "/" + f"state_vector_{t:04.3f}_p.csv"
+        fname = self._framesdir + "/" + f"state_vector_{t:04.3f}_p.csv"
         logger.info("Reading: %s", fname)
         sv = svec.read_from_file(fname)
         data = svec.extract_dist_sub(sv, bit_range[0], bit_range[1], eps=1e-12)
@@ -110,10 +124,11 @@ class H1D1Report:
 
     def _produce_video_frame(self, t: float, T, q_data, p_data):
         fig, axs = plt.subplots(3, 1, figsize=(8, 12), layout='constrained')
+        fig.suptitle(self._title + f" t={t:6.3f}")
         self._produce_psiq_frame(t, T, axs[0], q_data)
         self._produce_psip_frame(t, T, axs[1], p_data)
         self._produce_logpsip_frame(t, T, axs[2], p_data)
-        filename = f'{self.outdir}/t_{t:06.3f}.png'
+        filename = f'{self._framesdir}/t_{t:06.3f}.png'
         print("writing to file : ", filename)
         fig.savefig(filename)
         plt.close(fig)
@@ -123,11 +138,11 @@ class H1D1Report:
         rdq = math.sqrt(self._dq)
         np_qv = self._qv
         np_psi5q = q_data
+        psi_label = "ψ_q"
+        ax.set_title(psi_label)
         ax.plot(np_qv, (1/rdq)*np.abs(np_psi5q), label='|ψ(q)|')
         ax.plot(np_qv, (1/rdq)*np.real(np_psi5q), label='Re(ψ(q))')
         ax.plot(np_qv, (1/rdq)*np.imag(np_psi5q), label='Im(ψ(q))')
-        psi_label = "ψ_q"
-        ax.set_title(f't={t:6.3f},dt={self._delta_t},n1={self._n1},' + psi_label)
         ax.set_xlabel('q')
         ax.set_ylabel('amplitude')
         ax.legend()
@@ -148,6 +163,8 @@ class H1D1Report:
         np_psi4p = np.concatenate([ps4p2, ps4p1])
 
         rdp = math.sqrt(self._dp)
+        psi_label = "ψ_p"
+        ax.set_title(psi_label)
         ax.plot(np_pv, (1/rdp)*np.abs(np_psi4p), label='|ψ\u0303(p)|')
         ax.plot(np_pv, (1/rdp)*np.real(np_psi4p), label='Re(ψ\u0303(p))')
         ax.plot(np_pv, (1/rdp)*np.imag(np_psi4p), label='Im(ψ\u0303(p))')
@@ -184,12 +201,23 @@ class H1D1Report:
         ax.set_ylabel('log2(|ψ|)')
         ax.legend()
 
+    @property
+    def tagname(self):
+        return f"ex0_{self._n1}b.{self._num_nucl_iters}n.{self._num_elec_iters}e"
+    
+    @property
+    def moviefile(self):
+        return f"{self._outdir}/{self.tagname}.mp4"
+
     def generate_report(self):
         self._axs[0].legend()
         # axs[1].legend()
         # axs[2].legend()
         self._fig.savefig(
-            self.outdir
-            + f"/ex0_{self._n1}b.{self._num_nucl_iters}n.{self._num_elec_iters}e.dist.png"
+            self._outdir + "/" + self.tagname + ".dist.png"
         )
         plt.close(self._fig)
+
+        print("producing video : ", self.moviefile)
+        stream = ffmpeg.input(f'{self._framesdir}/t_*.png', pattern_type='glob', framerate=8)
+        ffmpeg.output(stream, self.moviefile, pix_fmt='yuv420p').run()
