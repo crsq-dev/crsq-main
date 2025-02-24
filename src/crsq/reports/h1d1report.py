@@ -144,23 +144,6 @@ class H1D1Report:
         self._trace_time.append(t)
         self._hk_trace.append(Hk)
         self._hp_trace.append(Hp)
-        self.record_hk_extreme(t, q_data, p_data)
-
-    def record_hk_extreme(self, t: float, q_data, p_data):
-        if len(self._hp_trace) < 30:
-            return
-        hk1 = self._hk_trace[-5]
-        hk2 = self._hk_trace[-3]
-        hk3 = self._hk_trace[-1]
-        dk1 = hk2 - hk1
-        dk2 = hk3 - hk2
-        if self._hkx_dir == 1 and dk1 < 0 and dk2 < 0:
-            self._record_hk_extreme_point(t, hk3, q_data, p_data)
-            self._hkx_dir = -1
-        elif self._hkx_dir == -1 and dk1 > 0 and dk2 > 0:
-            self._record_hk_extreme_point(t, hk3, q_data, p_data)
-            self._hkx_dir = 1
-
 
     def _plot_energy(self):
         fig, ax = plt.subplots(1, 1, figsize=(10, 8))
