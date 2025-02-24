@@ -1,9 +1,10 @@
 matplotlib
 cmasher
 numpy
-cupy
+cupy-cuda12x
 scipy
 pandas
 qiskit[visualization]
 qiskit-aer-gpu
 ffmpeg-python
+jupyter
