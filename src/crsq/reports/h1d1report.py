@@ -32,6 +32,7 @@ class H1D1Report:
         space_length: float,
         hp_func: Callable[[float], float],
         delta_t: float,
+        total_time: float,
         num_elec_iters: int,
         num_nucl_iters: int
     ):
@@ -47,6 +48,7 @@ class H1D1Report:
         self._psi_axis_scale = psi_axis_scale
         self._dq = space_length / self._M
         self._delta_t = delta_t
+        self._total_time = total_time
         self._T = delta_t*num_elec_iters*num_nucl_iters
         self._num_elec_iters = num_elec_iters
         self._num_nucl_iters = num_nucl_iters
@@ -132,7 +134,7 @@ class H1D1Report:
         self._axs[1].plot(self._qv, re, label=f"t={time:4.3f}")
         self._axs[2].plot(self._qv, im, label=f"t={time:4.3f}")
         """ add a frame for the video """
-        self._produce_video_frame(time, self._T, q_data, p_data)
+        self._produce_video_frame(time, q_data, p_data)
     
     def record_energy(self, t, q_data, p_data):
         Hk = np.sum(
@@ -164,18 +166,18 @@ class H1D1Report:
         fig.savefig(fname=filename)
         plt.close(fig)
 
-    def _produce_video_frame(self, t: float, T, q_data, p_data):
+    def _produce_video_frame(self, t: float, q_data, p_data):
         fig, axs = plt.subplots(3, 1, figsize=(8, 12), layout='constrained')
         fig.suptitle(self._title + f" t={t:6.3f}")
-        self._produce_psiq_frame(t, T, axs[0], q_data)
-        self._produce_psip_frame(t, T, axs[1], p_data)
-        self._produce_logpsip_frame(t, T, axs[2], p_data)
+        self._produce_psiq_frame(t, axs[0], q_data)
+        self._produce_psip_frame(t, axs[1], p_data)
+        self._produce_logpsip_frame(t, axs[2], p_data)
         filename = f'{self._framesdir}/t_{t:06.3f}.png'
         print("writing to file : ", filename)
         fig.savefig(filename)
         plt.close(fig)
 
-    def _produce_psiq_frame(self, t: float, T, ax: plt.Axes, q_data: npt.NDArray[np.complex128]):
+    def _produce_psiq_frame(self, t: float, ax: plt.Axes, q_data: npt.NDArray[np.complex128]):
         ax.set_ylim([-1, 1])
         rdq = math.sqrt(self._dq)
         np_qv = self._qv
@@ -189,7 +191,7 @@ class H1D1Report:
         ax.set_ylabel('amplitude')
         ax.legend()
 
-    def _produce_psip_frame(self, t: float, T, ax: plt.Axes, p_data: npt.NDArray[np.complex128]):
+    def _produce_psip_frame(self, t: float, ax: plt.Axes, p_data: npt.NDArray[np.complex128]):
         # 離散波数が -WM ~ WM の範囲の成分を表示する
         ax.set_ylim([-1.0, 1.0])
 
@@ -215,7 +217,7 @@ class H1D1Report:
         ax.set_ylabel('amplitude')
         ax.legend()
 
-    def _produce_logpsip_frame(self, t: float, T, ax: plt.Axes, p_data: npt.NDArray[np.complex128]):
+    def _produce_logpsip_frame(self, t: float, ax: plt.Axes, p_data: npt.NDArray[np.complex128]):
         ax.set_ylim([-30, 0])  # log range -30 to 0
         ax.grid(True)
         M = self._M

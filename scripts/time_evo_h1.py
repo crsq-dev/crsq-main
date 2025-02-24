@@ -109,6 +109,7 @@ class Parameters:
         )
 
         self.delta_t = delta_t  # a.u.
+        total_time = delta_t * num_elec_iters * num_nucl_iters
         self.disc_spec = DiscretizationSpec(self.delta_t)
         self.asy_spec = AntisymmetrizationSpec(self.wfr_spec, self.antisym_method)
         self.nuclei_data = [{"mass": 1680, "charge": 1, "pos": int(self.x0 / self.dq)}]
@@ -162,6 +163,7 @@ class Parameters:
             psi_axis_scale=0.6,
             space_length=self.L,
             delta_t=delta_t,
+            total_time=total_time,
             num_elec_iters=num_elec_iters,
             num_nucl_iters=num_nucl_iters,
         )
