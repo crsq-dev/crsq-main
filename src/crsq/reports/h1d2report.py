@@ -103,6 +103,12 @@ class H1D2Report:
         if os.path.exists(self.moviefile):
             os.remove(self.moviefile)
 
+    def add_circuit_diagram(self, circuit: QuantumCircuit, block_name: str):
+        """Add a circuit diagram to the report"""
+        fname = f"{self._outdir}/{block_name}.png"
+        logger.info(f"Saving circuit diagram of {block_name} to {fname}")
+        circuit.draw(output="mpl", filename=fname, scale=0.6, fold=100)
+
     def open_report(self) -> None:
         """"""
 
@@ -308,8 +314,7 @@ class H1D2Report:
             vmax=self._vmax,
         )
 
-        psi_label = self._psifunc_label
-        fig.suptitle(f"t={t:6.3f},dt={self._delta_t},n1={self._n1}," + psi_label)
+        fig.suptitle(self._title)
         filename = f"{self._frames_dir}/t_{t:06.3f}.png"
         print("writing to file : ", filename)
         fig.savefig(filename)

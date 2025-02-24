@@ -132,9 +132,9 @@ class Parameters:
             psifunc_label=self.psifunc2d.label,
             num_coordinate_bits=self.n1,
             zmin=0,
-            zmax=1,
-            vmin=-1,
-            vmax=1,
+            zmax=0.2,
+            vmin=-0.2,
+            vmax=0.2,
             space_length=self.L,
             delta_t=self.delta_t,
             num_elec_iters=self.num_elec_iters,
@@ -202,13 +202,18 @@ class Parameters:
             save_q_state_vector=False,  # False when we are just drawing
         )
 
-        self.stm_block = SuzukiTrotterMethodBlock(
+        stm_block = SuzukiTrotterMethodBlock(
             evo_spec, self.ene_spec, self.asy_spec, use_motion_block_gates=True
         )
 
-        fname = self.outdir + "/h2d.circuit.png"
-        self.stm_block.circuit.draw(output="mpl", filename=fname, scale=0.6, fold=100)
-        logger.info("draw the circuit to %s", fname)
+        logger.info("draw the circuit")
+        self.report.add_circuit_diagram(stm_block.circuit, "circuit")
+
+        emb = stm_block.build_electron_motion_block(sim_time=0)
+        self.report.add_circuit_diagram(emb.circuit, "elec_motion")
+
+        epbq = emb.build_elec_potential_block_qrom()
+        self.report.add_circuit_diagram(epbq.circuit, "elec_potential_qrom")
 
     def _make_evo_spec_for_running(self):
         rfq_spec = RfqPotentialSpec(
@@ -262,9 +267,9 @@ class Parameters:
         t = 0
         for _nucl_it in range(self.num_nucl_iters):
             t += dt * evo_spec.num_elec_per_atom_iterations
-            self._save_result_state_vectors(results, t, evo_spec)
+            self._save_result_state_vectors(circ, results, t, evo_spec)
 
-    def _save_result_state_vectors(self, results, t, evo_spec: TimeEvolutionSpec):
+    def _save_result_state_vectors(self, circuit, results, t, evo_spec: TimeEvolutionSpec):
         state_label_prefix_to_file_suffix = { "sv": "q"}
         if evo_spec.rfq_spec.should_save_state_vector_per_qrom:
             sv["qrom0"] = "qrom0"
@@ -276,14 +281,13 @@ class Parameters:
             if label in results.data():
                 sv = results.data()[label]
                 ssv = ssvec.sv_to_sparse(sv)
-                data2d = self._make_2d_data_from_ssv(ssv)
+                data2d = self._make_2d_data_from_ssv(circuit, ssv)
                 self.report.add_data_sample(suffix, t, data2d)
             else:
                 logger.warning("state vector %s was not found", label)
 
-    def _make_2d_data_from_ssv(self, ssv):
-        qc = self.stm_block.circuit
-        np_data2d = ssvec.extract_dist2d(qc, ssv, "e0y", "e0x")
+    def _make_2d_data_from_ssv(self, circuit, ssv):
+        np_data2d = ssvec.extract_dist2d(circuit, ssv, "e0y", "e0x")
         return np_data2d
 
     def draw_graph(self):
@@ -305,45 +309,6 @@ class Parameters:
         else:
             p_data = None
         self.report.produce_frame(time, q_data, p_data)
-
-        # fname = self.outdir + "/" + evo_spec.make_state_vector_file_name(time)
-        # logger.info("Reading: %s", fname)
-        # qc = self.stm_block.circuit
-        # ssv = ssvec.read_from_file(fname)
-        # logger.info("Extracting distribution")
-        # np_data2d = ssvec.extract_dist2d(qc, ssv, "e0y", "e0x")
-        # logger.info("make 2d data")
-        # data2d = np.zeros((self.M, self.M), dtype=np.complex64)
-        # for ix in range(self.M):
-        #     for iy in range(self.M):
-        #         data2d[(ix + self.M // 2) % self.M, (iy + self.M // 2) % self.M] = (
-        #             np_data2d[ix, iy]
-        #         )
-        # norm = np.linalg.norm(data2d)
-        # logger.info("norm(t=%4.3f)=%f", time, norm)
-        # qx = np.linspace(-self.L / 2, self.L / 2 - self.dq, self.M)
-        # qy = np.linspace(-self.L / 2, self.L / 2 - self.dq, self.M)
-        # xg, yg = np.meshgrid(qx, qy)
-        # np_xg = np.asnumpy(xg)
-        # np_yg = np.asnumpy(yg)
-        # np_ab = np.asnumpy(np.abs(data2d) / self.dq)
-        # np_re = np.asnumpy(np.real(data2d) / self.dq)
-        # np_im = np.asnumpy(np.imag(data2d) / self.dq)
-        # logger.info("Plot data")
-        # colormap = plt.get_cmap("cmr.guppy")
-        # axs[0].set_zlim(0, 0.175)
-        # axs[0].plot_surface(
-        #     np_xg, np_yg, np_ab, vmin=-0.2, vmax=0.2, label=f"t={time}", cmap=colormap
-        # )
-        # axs[1].set_zlim(-0.175, 0.175)
-        # axs[1].plot_surface(
-        #     np_xg, np_yg, np_re, vmin=-0.2, vmax=0.2, label=f"t={time}", cmap=colormap
-        # )
-        # axs[2].set_zlim(-0.175, 0.175)
-        # axs[2].plot_surface(
-        #     np_xg, np_yg, np_im, vmin=-0.2, vmax=0.2, label=f"t={time}", cmap=colormap
-        # )
-
 
 def run_experiment(par: Parameters, tag: str):
 
