@@ -39,10 +39,10 @@ class PsiH2D:
         m = self._m
         absm = abs(m)
         q0 = 1/(n+1/2)
-        dxv = qxv - (self._Qx0 + self._dq / 2)
-        dyv = qyv - (self._Qy0 + self._dq / 2)
+        dxv = qxv - self._Qx0
+        dyv = qyv - self._Qy0
         rho = np.sqrt(np.square(dxv) + np.square(dyv))
-        # rho[0,0] = self._dq / 2
+        rho[self._Qx0//self._dq, self._Qy0//self._dq] = self._dq / 2
         A = math.sqrt((q0**3 * math.factorial(n-absm))/(math.pi*math.factorial(n+absm)))
         q0rho = q0*rho
         q0rho2 = 2*q0rho
@@ -61,3 +61,34 @@ class PsiH2D:
     @property
     def name(self):
         return f'H2D_n_{self._n}_m_{self._m}_q0_{self._Qx0}_{self._Qy0}'
+    
+
+
+class VHAtom2:
+    """V(x) for H atom. potential function object - 2D version"""
+
+    def __init__(self, Qx0: float, Qy0: float, dq: float, Z: float):
+        self._Qx0 = Qx0
+        self._Qy0 = Qy0
+        self._dq = dq
+        self._Z = Z
+
+    def __call__(self, qxv: np.ndarray, qyv: np.ndarray) -> np.ndarray:
+        riA = np.sqrt(
+            (
+                np.square(qxv - self._Qx0)
+                + np.square(qyv - self._Qy0)
+            )
+        )
+        xq0 = int(self._Qx0 / self._dq)
+        yq0 = int(self._Qy0 / self._dq)
+        riA[xq0, yq0] = self._dq / 2
+        qe = -1
+        QA = 1
+        varray = (qe * QA) / riA
+        return varray
+
+    @property
+    def label(self):
+        return f"V(q)=-1/sqrt((q-({self._Qx0},{self._Qy0}))^2+{self._delta_qQ}^2)"
+

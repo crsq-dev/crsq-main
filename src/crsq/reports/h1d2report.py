@@ -37,7 +37,6 @@ class H1D2Report:
         vmax: float,
         space_length: float,
         delta_t: float,
-        total_time: float,
         num_elec_iters: int,
         num_nucl_iters: int,
     ):
@@ -59,7 +58,7 @@ class H1D2Report:
         self._vmin = vmin
         self._vmax = vmax
         self._delta_t = delta_t
-        self._total_time = total_time
+        self._total_time = delta_t*num_elec_iters*num_nucl_iters
         self._T = delta_t * num_elec_iters * num_nucl_iters
         self._num_elec_iters = num_elec_iters
         self._num_nucl_iters = num_nucl_iters
@@ -96,6 +95,8 @@ class H1D2Report:
         """"""
         dirname = self._frames_dir
         if not os.path.exists(dirname):
+            logger.info("Creating directory : %s", dirname)
+            print("Creating directory : ", dirname)
             os.makedirs(dirname)
         for f in glob.glob(f"{dirname}/t_*.png"):
             os.remove(f)
@@ -105,6 +106,46 @@ class H1D2Report:
     def open_report(self) -> None:
         """"""
 
+    def add_data_sample(self, label: str, t: float, q_data: npt.NDArray[np.complex128]) -> None:
+        """ save 2d grid data to a text file"""
+        file_name = self._frames_dir + f"/{t:06.3f}.{label}.csv"
+        self.write_2d_data(file_name, q_data)
+
+    def write_2d_data(self, file_name: str, data: npt.NDArray[np.complex128]) -> None:
+        """ save 2d grid data to a text file"""
+        if os.path.exists(file_name):
+            logger.info("removing old file : %s", file_name)
+            os.remove(file_name)
+        logger.info("Saving to : %s", file_name)
+        shp = data.shape
+        sumdata = np.sum(np.abs(data) ** 2)
+        maxdata = np.max(np.abs(data))
+        logger.info("sum of |ψ|^2 : %f", sumdata)
+        logger.info("max of |ψ| : %f", maxdata)
+        with open(file_name, "w") as f:
+            f.write(f"{shp[0]},{shp[1]}\n")
+            for i in range(shp[0]):
+                for j in range(shp[1]):
+                    f.write(f"{i},{j},{data[i,j].real},{data[i,j].imag}\n")
+
+    def read_2d_data(self, file_name: str) -> npt.NDArray[np.complex128]:
+        """ read 2d grid data from a text file"""
+        with open(file_name, "r") as f:
+            s = f.readline().split(",")
+            n1 = int(s[0])
+            n2 = int(s[1])
+            data = np.zeros((n1, n2), dtype=np.complex128)
+            for i in range(n1):
+                for j in range(n2):
+                    s = f.readline().split(",")
+                    data[i, j] = complex(float(s[2]), float(s[3]))
+        return data
+
+    def read_data_sample(self, label: str, t: float) -> npt.NDArray[np.complex128]:
+        """ read q-space 2d grid data from a text file"""
+        file_name = self._frames_dir + f"/{t:06.3f}.{label}.csv"
+        return self.read_2d_data(file_name)
+    
     def produce_frame(
         self,
         t: float,

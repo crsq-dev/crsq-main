@@ -59,6 +59,15 @@ def elec_elec_potential(r: float) -> float:
 # build the simulator
 
 class Parameters:
+
+    def hp_func(self, q: float) -> float:
+        r = np.abs(q - self.x0)
+        if r == 0:
+            invr = 2/self.dq
+        else:
+            invr = 1/r
+        return -1 * invr
+
     def __init__(
         self,
         outdir="output/default",
@@ -109,7 +118,6 @@ class Parameters:
         )
 
         self.delta_t = delta_t  # a.u.
-        total_time = delta_t * num_elec_iters * num_nucl_iters
         self.disc_spec = DiscretizationSpec(self.delta_t)
         self.asy_spec = AntisymmetrizationSpec(self.wfr_spec, self.antisym_method)
         self.nuclei_data = [{"mass": 1680, "charge": 1, "pos": int(self.x0 / self.dq)}]
@@ -147,25 +155,16 @@ class Parameters:
         self.use_saved_data = use_saved_data
         self.stm_block = None
 
-        def hp_func(q: float) -> float:
-            r = np.abs(q - self.x0)
-            if r == 0:
-                invr = 2/self.dq
-            else:
-                invr = 1/r
-            return -1 * invr
-
         self.report = H1D1Report(
             outdir,
-            f"H1D1 {self.device} {self.st_method} {self.precision} {self.n1}b {self.delta_t:.3f}",
+            title=f"H1D1 {self.device} {self.st_method} {self.precision} {self.n1}b dt{self.delta_t:.3f}",
             num_coordinate_bits=n1,
-            hp_func=hp_func,
+            hp_func=self.hp_func,
             psi_axis_scale=0.6,
             space_length=self.L,
             delta_t=delta_t,
-            total_time=total_time,
             num_elec_iters=num_elec_iters,
-            num_nucl_iters=num_nucl_iters,
+            num_nucl_iters=num_nucl_iters
         )
 
     def _make_reverse_bit_index(self):
@@ -287,11 +286,11 @@ class Parameters:
         t = 0
         for _nucl_it in range(self.num_nucl_iters):
             t += dt * self.evo_spec.num_elec_per_atom_iterations
-            self._add_plot(t)
+            self._add_plot_from_file(t)
 
         self.report.generate_report()
 
-    def _add_plot(self, time):
+    def _add_plot_from_file(self, time):
         qc = self.stm_block.circuit
         bit_range = svec.get_bit_range_for_reg(qc, "e0x")
         q_data = self.report.read_q_state_vector_file(time, bit_range)
@@ -303,7 +302,6 @@ class Parameters:
 def run_experiment(par: Parameters, tag: str):
 
     par.draw_circuits()
-    times = [0]
     if par.use_saved_data:
         logger.info("skip running the simulator")
     else:
