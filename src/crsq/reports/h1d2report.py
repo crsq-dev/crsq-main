@@ -36,6 +36,7 @@ class H1D2Report:
         vmin: float,
         vmax: float,
         space_length: float,
+        hp_func: Callable[[float, float], float],
         delta_t: float,
         num_elec_iters: int,
         num_nucl_iters: int,
@@ -51,6 +52,7 @@ class H1D2Report:
         self._M = M
         self._WM = self._M // 2
         self._L = space_length
+        self._hp_func = hp_func
         self._dq = self._L / self._M
         self._dq = space_length / self._M
         self._zmin = zmin
@@ -58,16 +60,26 @@ class H1D2Report:
         self._vmin = vmin
         self._vmax = vmax
         self._delta_t = delta_t
-        self._total_time = delta_t*num_elec_iters*num_nucl_iters
+        self._total_time = delta_t * num_elec_iters * num_nucl_iters
         self._T = delta_t * num_elec_iters * num_nucl_iters
         self._num_elec_iters = num_elec_iters
         self._num_nucl_iters = num_nucl_iters
 
+        # x,y and qx,qy values
         self._xv = np.zeros((M, M))
         self._yv = np.zeros((M, M))
         for i in range(M):
             self._yv[:, i] = np.linspace(0, M - 1, M)
             self._xv[i, :] = np.linspace(0, M - 1, M)
+        dq = self._dq
+        self._qxv = self._xv * dq
+        self._qyv = self._yv * dq
+        # potential energy
+        self._hpv = np.ndarray((self._M, self._M), np.float64)
+        for x in range(self._M):
+            for y in range(self._M):
+                self._hpv[x, y] = self._hp_func(x * dq, y * dq)
+
         # discretized wave number values
         kv = np.mod(np.linspace(-M // 2, M // 2 - 1, M), M) - (M // 2)
         kv2 = np.square(kv)
@@ -77,11 +89,8 @@ class H1D2Report:
             self._kyv2[:, i] = kv2
             self._kxv2[i, :] = kv2
         self._kv2 = self._kxv2 + self._kyv2
-
-        # value of V
-        dq = self._dq
-        self._qxv = self._xv * dq
-        self._qyv = self._yv * dq
+        dp = 2 * math.pi / self._L
+        self._hkv = self._kv2 * (dp * dp / 2.0)
 
         self._prepare_dir()
 
@@ -111,14 +120,20 @@ class H1D2Report:
 
     def open_report(self) -> None:
         """"""
+        self._trace_time = []
+        self._hk_trace = []
+        self._hp_trace = []
 
-    def add_data_sample(self, label: str, t: float, q_data: npt.NDArray[np.complex128]) -> None:
-        """ save 2d grid data to a text file"""
+    def add_data_sample(
+        self, label: str, t: float, q_data: npt.NDArray[np.complex128]
+    ) -> None:
+        """save 2d grid data to a text file"""
         file_name = self._frames_dir + f"/{t:06.3f}.{label}.csv"
+        print("Saving to : ", file_name)
         self.write_2d_data(file_name, q_data)
 
     def write_2d_data(self, file_name: str, data: npt.NDArray[np.complex128]) -> None:
-        """ save 2d grid data to a text file"""
+        """save 2d grid data to a text file"""
         if os.path.exists(file_name):
             logger.info("removing old file : %s", file_name)
             os.remove(file_name)
@@ -135,7 +150,7 @@ class H1D2Report:
                     f.write(f"{i},{j},{data[i,j].real},{data[i,j].imag}\n")
 
     def read_2d_data(self, file_name: str) -> npt.NDArray[np.complex128]:
-        """ read 2d grid data from a text file"""
+        """read 2d grid data from a text file"""
         with open(file_name, "r") as f:
             s = f.readline().split(",")
             n1 = int(s[0])
@@ -148,10 +163,10 @@ class H1D2Report:
         return data
 
     def read_data_sample(self, label: str, t: float) -> npt.NDArray[np.complex128]:
-        """ read q-space 2d grid data from a text file"""
+        """read q-space 2d grid data from a text file"""
         file_name = self._frames_dir + f"/{t:06.3f}.{label}.csv"
         return self.read_2d_data(file_name)
-    
+
     def produce_frame(
         self,
         t: float,
@@ -320,8 +335,40 @@ class H1D2Report:
         fig.savefig(filename)
         plt.close(fig)
 
+    def record_energy(self, t, q_data, p_data):
+        Hk = np.sum(np.abs(p_data * np.conjugate(p_data)) * self._hkv).item()
+        Hp = np.sum(np.abs(q_data * np.conjugate(q_data)) * self._hpv).item()
+        self._trace_time.append(t)
+        self._hk_trace.append(Hk)
+        self._hp_trace.append(Hp)
+
+    def _plot_energy(self):
+        fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+        psi_label = self._psifunc_label
+        ax.set_title(f"M={self._M},L={self._L},T={self._T:6.3f},dt={self._delta_t} {psi_label}")
+        npt = np.array(self._trace_time)
+        nphk = np.array(self._hk_trace)
+        nphp = np.array(self._hp_trace)
+        nphtot = nphk + nphp
+        ax.grid(True)
+        ax.plot(npt, nphk, label="Hk(t)")
+        ax.plot(npt, nphp, label="Hp(t)")
+        ax.plot(npt, nphtot, label="Hk(t)+Hp(t)")
+        ax.set_xlabel("t (time)")
+        ax.set_ylabel("energy")
+        ax.legend()
+        filename = f"{self._outdir}/energy_trace.png"
+        print("writing to file : ", filename)
+        fig.savefig(fname=filename)
+        plt.close(fig)
+
+
     def generate_report(self) -> None:
         """"""
+        self._plot_energy()
+        self._produce_video()
+
+    def _produce_video(self) -> None:
         moviefile = self.moviefile
         print("producing video : ", moviefile)
         stream = ffmpeg.input(

@@ -51,10 +51,12 @@ class H1D1Report:
         self._T = delta_t * num_elec_iters * num_nucl_iters
         self._num_elec_iters = num_elec_iters
         self._num_nucl_iters = num_nucl_iters
+        # x and qx values
         self._xv = np.linspace(0, self._M - 1, self._M)
         self._qv = self._xv * self._dq
         # potential energy function
         self._hpv = np.ndarray(self._M, np.float64)
+        # hp_func cannot be applied to a numpy array
         for x in range(self._M):
             self._hpv[x] = self._hp_func(x * self._dq)
         self._kv = np.concatenate(

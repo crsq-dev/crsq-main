@@ -4,7 +4,11 @@
 
 import math
 import cupy as np
+import cupy.typing as npt
 import scipy.special as sp
+import logging
+
+logger = logging.getLogger(__name__)
 
 class PsiH2D:
     """ Hydrogen atom, 2 dimensional model
@@ -25,6 +29,7 @@ class PsiH2D:
             raise ValueError(f"Invalid quantum numbers: n={n}, m={m}. must be |m| <= n")
         self._n = n
         self._m = m
+        logger.info("PsiH2D.__init__:   n = %d, m = %d", n, m)
 
     def __call__(self, qxv: np.ndarray, qyv: np.ndarray) -> np.ndarray:
         """ calculate the wave function of the hydrogen atom in 2D model.
@@ -35,6 +40,7 @@ class PsiH2D:
         Returns:
             psi: np.ndarray[(M,M)] : wave function values
         """
+        logger.info("PsiH2D.__call__")
         n = self._n
         m = self._m
         absm = abs(m)
@@ -44,11 +50,13 @@ class PsiH2D:
         rho = np.sqrt(np.square(dxv) + np.square(dyv))
         rho[self._Qx0//self._dq, self._Qy0//self._dq] = self._dq / 2
         A = math.sqrt((q0**3 * math.factorial(n-absm))/(math.pi*math.factorial(n+absm)))
+        logger.info("PsiH2D:   A = ", A)
         q0rho = q0*rho
         q0rho2 = 2*q0rho
 
         np_q0rho2 = np.asnumpy(q0rho2)
         np_lg = sp.assoc_laguerre(np_q0rho2, n-absm, 2*absm)
+        logger.info("PsiH2d:   np_lg = ", np_lg)
         lg = np.array(np_lg)
 
         psi = (A * np.power(q0rho2, absm) * np.exp(-q0rho) * lg * np.power(((dxv+1j*dyv)/rho),m))
