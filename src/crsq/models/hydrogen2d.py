@@ -48,18 +48,20 @@ class PsiH2D:
         dxv = qxv - self._Qx0
         dyv = qyv - self._Qy0
         rho = np.sqrt(np.square(dxv) + np.square(dyv))
-        rho[self._Qx0//self._dq, self._Qy0//self._dq] = self._dq / 2
+        x0 = self._Qx0 // self._dq
+        y0 = self._Qy0 // self._dq
         A = math.sqrt((q0**3 * math.factorial(n-absm))/(math.pi*math.factorial(n+absm)))
-        logger.info("PsiH2D:   A = %f", A)
         q0rho = q0*rho
         q0rho2 = 2*q0rho
 
         np_q0rho2 = np.asnumpy(q0rho2)
         np_lg = sp.assoc_laguerre(np_q0rho2, n-absm, 2*absm)
-        logger.info("PsiH2d:   np_lg = ", np_lg)
         lg = np.array(np_lg)
 
-        psi = (A * np.power(q0rho2, absm) * np.exp(-q0rho) * lg * np.power(((dxv+1j*dyv)/rho),m))
+        omega = (dxv+1j*dyv)/rho
+        omega[x0, y0] = 1
+
+        psi = (A * np.power(q0rho2, absm) * np.exp(-q0rho) * lg * np.power(omega, m))
         return psi
 
     @property

@@ -329,7 +329,7 @@ class H1D2Report:
             vmax=self._vmax,
         )
 
-        fig.suptitle(self._title)
+        fig.suptitle(self._title + f" t={t:6.3f}")
         filename = f"{self._frames_dir}/t_{t:06.3f}.png"
         print("writing to file : ", filename)
         fig.savefig(filename)
