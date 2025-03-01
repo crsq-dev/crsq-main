@@ -76,10 +76,12 @@ class ElectronMotionBlock(heap.Frame):
         if evo_spec.should_use_rfq_gray_code:
             self._target = QuantumRegister(1, "target")
             self.add_param(self._target)
-        if evo_spec.should_save_p_state_vector and self._is_last_elec_iter:
-            padding_bits = (wfr_spec.num_coordinate_bits - 1) * wfr_spec.dimension
-            self._padding_regs = QuantumRegister(padding_bits, "pad")
-            self.add_local(self._padding_regs)
+            # additionally, we want to allocate padding registers when saving state vector.
+            # so that the circuit size will match the total outer-most circuit size.
+            if evo_spec.should_save_p_state_vector and self._is_last_elec_iter:
+                padding_bits = (wfr_spec.num_coordinate_bits - 1) * wfr_spec.dimension
+                self._padding_regs = QuantumRegister(padding_bits, "pad")
+                self.add_local(self._padding_regs)
 
     def build_circuit_on(self, other_frame: heap.Frame):
         """ Build the instructions on another compatible quantum circuit."""

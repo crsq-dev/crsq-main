@@ -117,7 +117,7 @@ class H1D1Report:
         sv = svec.read_from_file(fname)
         data = svec.extract_dist_sub(sv, bit_range[0], bit_range[1], eps=1e-12)
         norm = np.linalg.norm(data)
-        logger.info("norm(t=%d)=%f", t, norm)
+        logger.info("norm(t=%f)=%f", t, norm)
         return data
 
     def read_p_state_vector_file(self, t: float, bit_range: Tuple[int, int]):
