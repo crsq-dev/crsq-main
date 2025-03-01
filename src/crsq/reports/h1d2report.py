@@ -79,11 +79,15 @@ class H1D2Report:
         self._qxv = self._xv * dq
         self._qyv = self._yv * dq
         # potential energy
-        # self._hpv = self._hp_func(self._qxv, self._qyv)
-        self._hpv = numpy.ndarray((self._M, self._M), numpy.float64)
-        for x in range(self._M):
-            for y in range(self._M):
-                self._hpv[x, y] = self._hp_func(x * dq, y * dq)
+
+        # works for time_evo_2d_h1.py:
+        self._hpv = self._hp_func(self._qxv, self._qyv)
+
+        # works for time_evo_classical_2d_h1.py:
+        # self._hpv = numpy.ndarray((self._M, self._M), numpy.float64)
+        # for x in range(self._M):
+        #     for y in range(self._M):
+        #         self._hpv[x, y] = self._hp_func(x * dq, y * dq)
 
         # discretized wave number values
         kv = numpy.mod(numpy.linspace(-M // 2, M // 2 - 1, M), M) - (M // 2)
