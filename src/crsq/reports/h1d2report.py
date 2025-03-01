@@ -40,10 +40,11 @@ class H1D2Report:
         delta_t: float,
         num_elec_iters: int,
         num_nucl_iters: int,
+        colormap_name: str = "cmr.guppy",
     ):
         self._outdir = outdir
         self._plot_type = plot_type
-        self._colormap_name = "cmr.guppy"
+        self._colormap_name = colormap_name
         self._frames_dir = outdir + "/frames"
         self._title = title
         self._psifunc_label = psifunc_label
