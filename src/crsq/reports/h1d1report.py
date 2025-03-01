@@ -189,7 +189,7 @@ class H1D1Report:
         rdq = math.sqrt(self._dq)
         np_qv = self._qv
         np_psi5q = q_data
-        psi_label = "ψ_q"
+        psi_label = "ψ(q)"
         ax.set_title(psi_label)
         ax.plot(np_qv, (1 / rdq) * np.abs(np_psi5q), label="|ψ(q)|")
         ax.plot(np_qv, (1 / rdq) * np.real(np_psi5q), label="Re(ψ(q))")
@@ -211,16 +211,18 @@ class H1D1Report:
         pv2 = self._pv[M - WM : M]
         np_pv = np.concatenate([pv2, pv1])
 
-        ps4p1 = p_data[0:WM]
-        ps4p2 = p_data[M - WM : M]
+        rdp = math.sqrt(self._dp)
+        psi4p = p_data / rdp  # scale psi
+
+        ps4p1 = psi4p[0:WM]
+        ps4p2 = psi4p[M - WM : M]
         np_psi4p = np.concatenate([ps4p2, ps4p1])
 
-        rdp = math.sqrt(self._dp)
-        psi_label = "ψ_p"
+        psi_label = "ψ\u0303(p)"
         ax.set_title(psi_label)
-        ax.plot(np_pv, (1 / rdp) * np.abs(np_psi4p), label="|ψ\u0303(p)|")
-        ax.plot(np_pv, (1 / rdp) * np.real(np_psi4p), label="Re(ψ\u0303(p))")
-        ax.plot(np_pv, (1 / rdp) * np.imag(np_psi4p), label="Im(ψ\u0303(p))")
+        ax.plot(np_pv, np.abs(np_psi4p), label="|ψ\u0303(p)|")
+        ax.plot(np_pv, np.real(np_psi4p), label="Re(ψ\u0303(p))")
+        ax.plot(np_pv, np.imag(np_psi4p), label="Im(ψ\u0303(p))")
         # the xlabel will clash with the title of the third graph.
         # ax.set_xlabel('p')
         ax.set_ylabel("amplitude")
@@ -229,7 +231,7 @@ class H1D1Report:
     def _produce_logpsip_frame(
         self, t: float, ax: plt.Axes, p_data: npt.NDArray[np.complex128]
     ):
-        ax.set_ylim([-30, 0])  # log range -30 to 0
+        ax.set_ylim([-80, 0])  # log range -30 to 0
         ax.grid(True)
         M = self._M
         WM = self._WM
@@ -238,11 +240,13 @@ class H1D1Report:
         pv2 = self._pv[M - WM : M]
         np_pv = np.concatenate([pv2, pv1])
 
-        logpsi = np.log2(np.abs(p_data))
+        rdp = math.sqrt(self._dp)
+        psi4p = p_data / rdp  # scale psi
+        logpsi = 20*np.log10(np.abs(psi4p))
         logp1 = logpsi[0:WM]
         logp2 = logpsi[M - WM : M]
         np_logp = np.concatenate([logp2, logp1])
-        ax.plot(np_pv, np_logp, label="log2|ψ\u0303(p)|\u221adp")
+        ax.plot(np_pv, np_logp, label="20log_10|ψ\u0303(p)|")
 
         # logt = np.log2(self._tarray)
         # logt1 = logt[0:WM]
@@ -250,10 +254,10 @@ class H1D1Report:
         # np_logt = np.asnumpy(np.concatenate([logt2, logt1]))
         # ax.plot(np_pv, np_logt, label='log2(T)')
 
-        ax.set_title(f"log2|ψ\u0303(p)|\u221adp")
+        ax.set_title(f"20log_10|ψ\u0303(p)|")
 
         ax.set_xlabel("p [rad/bohr]")
-        ax.set_ylabel("log2(|ψ|)")
+        ax.set_ylabel("dB")
         ax.legend()
 
     @property
