@@ -4,7 +4,6 @@
 
 import math
 import cupy as np
-import cupy.typing as npt
 import scipy.special as sp
 import logging
 
