@@ -59,6 +59,7 @@ class PsiH2D:
         lg = np.array(np_lg)
 
         omega = (dxv+1j*dyv)/rho
+        # suppress division by zero
         omega[x0, y0] = 1
 
         psi = (A * np.power(q0rho2, absm) * np.exp(-q0rho) * lg * np.power(omega, m))

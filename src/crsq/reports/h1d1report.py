@@ -31,7 +31,6 @@ class H1D1Report:
         space_length: float,
         hp_func: Callable[[float], float],
         delta_t: float,
-        total_time: float,
         num_elec_iters: int,
         num_nucl_iters: int,
     ):
@@ -47,7 +46,6 @@ class H1D1Report:
         self._psi_axis_scale = psi_axis_scale
         self._dq = space_length / self._M
         self._delta_t = delta_t
-        self._total_time = total_time
         self._T = delta_t * num_elec_iters * num_nucl_iters
         self._num_elec_iters = num_elec_iters
         self._num_nucl_iters = num_nucl_iters

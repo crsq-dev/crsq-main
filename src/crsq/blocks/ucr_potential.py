@@ -8,6 +8,7 @@ import math
 import time
 import logging
 import numpy as np
+from typing import Callable
 
 from qiskit import QuantumRegister
 from qiskit.circuit.library import UCRZGate
@@ -15,17 +16,17 @@ from crsq_heap.heap import Frame, Binding
 from crsq.blocks import gray_code_qrom
 
 logger = logging.getLogger(__name__)
-LOG_TIME_THRESH = 1
+LOG_TIME_THRESH = 0.0
 
-class RadialFuncGrayCodeQrom(Frame):
-    """ 2D- Radial function implemented using gray code QROM
+class UCRPotential2d(Frame):
+    """ 2D- Potential function implemented by a uniformly controlled rotation gate
     Args of __init__:
         num_coord_bits: int
             number of bits for each coordinate
         dq: float
             grid spacing
         rfunc: callable
-            radial function to be implemented
+            potential function to be implemented
         build: bool
             if True, build the circuit
     
@@ -42,7 +43,7 @@ class RadialFuncGrayCodeQrom(Frame):
         self,
         num_coord_bits: int,
         dq: float,
-        rfunc: callable,
+        rfunc: Callable[[float, float], float],
         build = True
     ):
         super().__init__(label="RadialFuncGrayCodeQROM")
@@ -104,7 +105,7 @@ class RadialFuncGrayCodeQrom(Frame):
         return Binding(self, {"x": x, "y": y, "target": target})
 
 
-class RadialFuncGrayCodeQromTestBoard(Frame):
+class UCRPotential2dTestBoard(Frame):
     def __init__(
         self,
         n: int,
@@ -134,7 +135,7 @@ class RadialFuncGrayCodeQromTestBoard(Frame):
         qc = self.circuit
         qc.h(self._x)
         qc.h(self._y)
-        self._rfq = RadialFuncGrayCodeQrom(
+        self._rfq = UCRPotential2d(
             self._n,
             self._dq,
             self._rfunc
@@ -146,16 +147,19 @@ class RadialFuncGrayCodeQromTestBoard(Frame):
         return self._rfq.regs
 
 
-class RadialFuncGrayCodeQrom1d(Frame):
-    """ 1D- Radial function implemented using gray code QROM
+class UCRPotential1d(Frame):
+    """ 1D- Potential function implemented by a uniformly controlled rotation gate
 
     Args of __init__:
         num_coord_bits: int
             number of bits for each coordinate
         dq: float
             grid spacing
-        rfunc: callable
-            radial function to be implemented
+        phase_shift_func: callable
+            phase shift function of q (not r) to be implemented by the UCR gate.
+            This function should calculate -δt*V(q)/hbar.
+            The function should embed the location of the nucleus.
+            should return some reasonable value for poles.
         build: bool
             if True, build the circuit
     
@@ -170,15 +174,15 @@ class RadialFuncGrayCodeQrom1d(Frame):
         self,
         num_coord_bits: int,
         dq: float,
-        rfunc: callable,
+        phase_shift_func: Callable[[float], float],
         build = True
     ):
-        super().__init__(label="RadialFuncGrayCodeQROM")
-        logger.info("start: RadialFuncGrayCodeQROM")
+        super().__init__(label="UCRPotential1d")
+        logger.info("start: UCRPotential1d")
         t1 = time.time()
         self._num_coord_bits = num_coord_bits
         self._dq = dq
-        self._rfunc = rfunc
+        self._phase_shift_func = phase_shift_func
         self._prepare_data()
         self.allocate_registers()
         if build:
@@ -186,22 +190,19 @@ class RadialFuncGrayCodeQrom1d(Frame):
         t2 = time.time()
         dt = t2 - t1
         if dt > LOG_TIME_THRESH:
-            logger.info("end : RadialFuncGrayCodeQROM() %f msec", round(dt * 1000))
+            logger.info("end : UCRPotential1d() %f msec", round(dt * 1000))
     
     def _prepare_data(self):
         n = self._num_coord_bits
         M = 1 << n
         self._data = np.ndarray(M, dtype = float)
         for i in range(M):
-            si = (i + M // 2) % M - (M // 2)
-            q = si * self._dq
-            r = abs(q)
-            if r == 0:
-                r = self._dq/2
-            psi = self._rfunc(r)
-            # logger.info("i=%d, q=%f, r=%f, psi=%f", i, q, r, psi)
+            q = i * self._dq
+            psi = self._phase_shift_func(q)
+            # logger.info("i=%d, q=%f, psi=%f", i, q, psi)
             if abs(psi) > math.pi:
-                logger.warning("large value of |psi| at x=%f, r=%f, psi=%f", si, r, psi)
+                logger.warning("large value of |psi| at x=%f, q=%f, psi=%f", i, q, psi)
+            # UCR gates will shift -θ/2 to |0> state, so we need to multiply by -2.0
             self._data[i] = -2.0 * psi
 
     def allocate_registers(self):

@@ -43,18 +43,18 @@ def hydrogen1d_psi(xa: np.ndarray, x0: float, N: int):
     return psi
 
 
-def elec_proton_potential(r: float) -> float:
-    if r == 0:
-        raise ValueError("r == 0")
-    qq = -1 * 1
-    return qq / r
+# def elec_proton_potential(r: float) -> float:
+#     if r == 0:
+#         raise ValueError("r == 0")
+#     qq = -1 * 1
+#     return qq / r
 
 
-def elec_elec_potential(r: float) -> float:
-    if r == 0:
-        raise ValueError("r == 0")
-    qq = -1 * -1
-    return qq / r
+# def elec_elec_potential(r: float) -> float:
+#     if r == 0:
+#         raise ValueError("r == 0")
+#     qq = -1 * -1
+#     return qq / r
 
 # build the simulator
 
@@ -67,6 +67,18 @@ class Parameters:
         else:
             invr = 1/r
         return -1 * invr
+    
+    def elec_proton_potential_func(self, r: float) -> float:
+        if r == 0:
+            r = self.dq/2
+        qq = -1 * 1
+        return qq / r
+    
+    def elec_elec_potential_func(self, r: float) -> float:
+        if r == 0:
+            r = self.dq/2
+        qq = -1 * -1
+        return qq / r
 
     def __init__(
         self,
@@ -127,8 +139,8 @@ class Parameters:
         if self.st_method == SUZUKI_TROTTER_QROM:
             self.rfq_spec = RfqPotentialSpec(
                 self.wfr_spec,
-                elec_elec_potential,
-                elec_proton_potential,
+                self.elec_elec_potential_func,
+                self.elec_proton_potential_func,
                 use_symmetry=False,
                 use_transpose=False,
                 use_gray_code=True,
@@ -159,9 +171,9 @@ class Parameters:
             outdir,
             title=f"H1D1 {self.device} {self.st_method} {self.precision} {self.n1}b dt{self.delta_t:.3f}",
             num_coordinate_bits=n1,
-            hp_func=self.hp_func,
             psi_axis_scale=0.6,
             space_length=self.L,
+            hp_func=self.hp_func,
             delta_t=delta_t,
             num_elec_iters=num_elec_iters,
             num_nucl_iters=num_nucl_iters
@@ -330,7 +342,7 @@ if __name__ == "__main__":
         choices=[SUZUKI_TROTTER_ARITHMETIC, SUZUKI_TROTTER_QROM],
         required=True
     )
-    parser.add_argument("--use-saved-data", type=str, required=True)
+    parser.add_argument("--use-saved-data", type=str, choices=["True", "False"], required=True)
     parser.add_argument("--delta-t", type=float, required=True)
     args = parser.parse_args()
 
