@@ -4,6 +4,7 @@
 from typing import List
 from collections.abc import Callable
 import time, logging, math
+import cupy as np
 
 from contextlib import contextmanager
 
@@ -119,9 +120,9 @@ class RfqElectronPotentialBlock(heap.Frame):
             raise NotImplementedError("Moving nuclei are not implemented yet.")
         if wfr_spec.num_stationary_nuclei != 1:
             raise NotImplementedError("Stationary nuclei should be 1.")
-        X0 = ham_spec.nuclei_data[0]["pos"]
-        self._Q0 = wfr_spec.delta_q * X0
-        logger.info("RfqElectronPotentialBlock: X0 = %f, Q0=%f", X0, self._Q0)
+        X0, Y0 = ham_spec.nuclei_data[0]["pos"]
+        self._Q0 = [wfr_spec.delta_q * X0, wfr_spec.delta_q * Y0]
+        logger.info("RfqElectronPotentialBlock: X0 = %s, Y0 = %s, Q0=%s", X0, Y0, self._Q0)
         if allocate:
             self.allocate_registers()
             if build:
@@ -148,7 +149,7 @@ class RfqElectronPotentialBlock(heap.Frame):
         r = abs(qdiff)
         return -self._disc_spec.delta_t * self._rfq_spec.elec_elec_potential_func(r)
 
-    def _elec_elec_phase_shift_1d(self, qxdiff: float, qydiff: float):
+    def _elec_elec_phase_shift_2d(self, qxdiff: float, qydiff: float):
         """ calculate -δt*Vee(r)/hbar, where r=sqrt(qxdiff**2 + qydiff**2)
             -delta_t * Vee(q)
         """
@@ -243,19 +244,19 @@ class RfqElectronPotentialBlock(heap.Frame):
                 if dt > LOG_TIME_THRESH:
                     logger.info("  Vee(%d,%d) done. %d msec", ie, ih, round(dt * 1000))
 
-    def _apply_radial_func_qrom_2d(self, xr: ast.Register, yr: ast.Register, rfunc):
+    def _apply_radial_func_qrom_2d(self, xr: ast.Register, yr: ast.Register, rfunc2d: Callable[[float, float], float]):
         wfr_spec = self._wfr_spec
         rfq_spec = self._rfq_spec
         if rfq_spec.should_use_gray_code:
             rfgcq = ucr_potential.UCRPotential2d(
-                wfr_spec.num_coordinate_bits, wfr_spec.delta_q, rfunc
+                wfr_spec.num_coordinate_bits, wfr_spec.delta_q, rfunc2d
             )
             self.invoke(rfgcq.bind(x=xr.register, y=yr.register, target=self._target))
         else:
             rfq = radial_func_qrom.RadialFuncQrom(
                 wfr_spec.num_coordinate_bits,
                 wfr_spec.delta_q,
-                rfunc,
+                rfunc2d,
                 use_symmetry=rfq_spec.should_use_symmetry,
                 use_transpose=rfq_spec.should_use_transpose,
             )
@@ -314,19 +315,8 @@ class RfqElectronPotentialBlock(heap.Frame):
                 eyr = scope.register(self._eregs[ie][1], signed=True)
                 ndata = nuclei_data[num_moving_nuclei + ia]
                 pos = ndata["pos"]
-                if not (pos[0] == 0 and pos[1] == 0):
-                    axc = scope.constant(
-                        int(pos[0] / wfr_spec.delta_q),
-                        wfr_spec.num_coordinate_bits,
-                        signed=True,
-                    )
-                    ayc = scope.constant(
-                        int(pos[1] / wfr_spec.delta_q),
-                        wfr_spec.num_coordinate_bits,
-                        signed=True,
-                    )
-                    exr -= axc
-                    eyr -= ayc
+                # we don't need subtractions here because the UCR data
+                # takes into concern the position of the nucleus.
                 scope.build_circuit()
 
                 self._apply_radial_func_qrom_2d(exr, eyr, self._elec_nucl_phase_shift_2d)

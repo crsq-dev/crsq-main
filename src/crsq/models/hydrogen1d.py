@@ -4,7 +4,6 @@ import math
 import numpy
 import numpy.typing as npyt
 
-import cupy as np
 import scipy.special as sp
 
 class VHAtom:
@@ -23,12 +22,12 @@ class VHAtom:
 
     def __call__(self, qv: npyt.NDArray[numpy.float64]) -> npyt.NDArray[numpy.float64]:
         # riA は、各格子点での原子核までの距離単位は格子間隔。
-        riA = np.abs(np.subtract(qv, self._Q0))
+        riA = numpy.abs(numpy.subtract(qv, self._Q0))
         qe = -1
         QA = self._Z
         # ゼロ除算を防ぐために、ゼロになるところは 1/r を inv0 で置き換える。
-        zero_index = np.where(riA == 0)[0]
-        varray = np.divide(qe * QA, riA)
+        zero_index = numpy.where(riA == 0)[0]
+        varray = numpy.divide(qe * QA, riA)
         varray[zero_index] = qe * QA * self._inv0
         return varray
 
@@ -47,7 +46,7 @@ class PsiH1D_Loudon:
         if N <= 0:
             raise ValueError(f"N must be positive integer, but {N} is given.")
 
-    def __call__(self, qv: npyt.NDArray[np.float64]) -> npyt.NDArray[np.float64]:
+    def __call__(self, qv: npyt.NDArray[numpy.float64]) -> npyt.NDArray[numpy.float64]:
         N = self._N  # primary quantum number
         hbar = 1
         me = 1
@@ -55,15 +54,15 @@ class PsiH1D_Loudon:
         a0 = 1
         a0 = hbar * hbar / (me * qe * qe)
         x = qv - self._Q0
-        absx = np.abs(x)
-        A = np.sqrt(2 / ((a0**3) * (N**5) * math.factorial(N) ** 2))
-        np_absx = np.asnumpy(absx)
+        absx = numpy.abs(x)
+        A = numpy.sqrt(2 / ((a0**3) * (N**5) * math.factorial(N) ** 2))
+        np_absx = numpy.asnumpy(absx)
         np_lg = sp.assoc_laguerre(2 * np_absx / (N * a0), N - 1, 1)
-        lg = np.array(np_lg)
+        lg = numpy.array(np_lg)
         if self._odd:
-            psi = A * np.exp(-absx / (N * a0)) * x * lg
+            psi = A * numpy.exp(-absx / (N * a0)) * x * lg
         else:
-            psi = A * np.exp(-absx / (N * a0)) * absx * lg
+            psi = A * numpy.exp(-absx / (N * a0)) * absx * lg
         return psi
 
     @property
@@ -88,7 +87,7 @@ class PsiH1D_Palma:
         if N <= 0:
             raise ValueError(f"N must be positive integer, but {N} is given.")
 
-    def __call__(self, qv: np.ndarray) -> np.ndarray:
+    def __call__(self, qv: numpy.ndarray) -> numpy.ndarray:
         N = self._N  # primary quantum number
         hbar = 1
         me = 1
@@ -96,18 +95,18 @@ class PsiH1D_Palma:
         a0 = 1
         a0 = hbar**2 / (me * qe**2)
         z = (2 / N / a0) * (qv - self._Q0)
-        absz = np.abs(z)
-        np_absz = np.asnumpy(absz)
+        absz = numpy.abs(z)
+        np_absz = numpy.asnumpy(absz)
         An = (
             (-1) ** N
-            * np.sqrt(2 * N * a0)
+            * numpy.sqrt(2 * N * a0)
             / (math.factorial(N) * (N**3) * (a0**2))
             * (N * a0)
             / 2
         )
         np_lg = sp.assoc_laguerre(np_absz, N - 1, 1)
-        lg = np.array(np_lg)
-        psi = An * z * np.exp(-absz / 2) * lg
+        lg = numpy.array(np_lg)
+        psi = An * z * numpy.exp(-absz / 2) * lg
         return psi
 
     @property

@@ -1,11 +1,7 @@
-import math, os, argparse
+import os, argparse
 
-# import numpy as np
-import cupy as np
-from matplotlib import pyplot as plt
-from matplotlib.axes import Axes
-import cmasher as cmr
-import scipy.special as sp
+# This module does not use cupy.
+import numpy as np
 
 from crsq.blocks.antisymmetrization import AntisymmetrizationSpec
 from crsq.blocks.discretization import DiscretizationSpec
@@ -21,30 +17,15 @@ from crsq.models import hydrogen2d
 from qiskit_aer import AerSimulator
 from qiskit import transpile
 import crsq.utils.sparse_statevector as ssvec
-import crsq.utils.statevector as svec
 from crsq.reports import H1D2Report
 
 import logging
 
 logger = logging.getLogger("crsq-main.scripts")
 
-
-def elec_proton_potential(r: float) -> float:
-    if r == 0:
-        raise ValueError("r == 0")
-    return -1 / r
-
-
-def elec_elec_potential(r: float) -> float:
-    if r == 0:
-        raise ValueError("r == 0")
-    return 1 / r
-
-
 # build the simulator
-
-
 class Parameters:
+
     def __init__(
         self,
         outdir,
@@ -136,6 +117,7 @@ class Parameters:
             vmin=-0.2,
             vmax=0.2,
             space_length=self.L,
+            hp_func=hydrogen2d.VHAtom2(self.L/2, self.L/2, self.dq, Z=1),
             delta_t=self.delta_t,
             num_elec_iters=self.num_elec_iters,
             num_nucl_iters=self.num_nucl_iters
@@ -172,6 +154,16 @@ class Parameters:
             [1], initial_electron_orbitals, initial_nucleus_orbitals
         )
 
+    def elec_proton_potential(self, r: float) -> float:
+        if r == 0:
+            return -2 / self.dq
+        return -1 / r
+
+    def elec_elec_potential(self, r: float) -> float:
+        if r == 0:
+            return 2 / self.dq
+        return 1 / r
+
     def draw_circuits(self):
 
         # psix = np.zeros(M)
@@ -184,8 +176,8 @@ class Parameters:
         )
         rfq_spec = RfqPotentialSpec(
             self.wfr_spec,
-            elec_elec_potential,
-            elec_proton_potential,
+            self.elec_elec_potential,
+            self.elec_proton_potential,
             use_symmetry=self.use_symmetry,
             use_transpose=self.use_transpose,
             use_gray_code=self.use_gray_code,
@@ -200,6 +192,7 @@ class Parameters:
             method=SUZUKI_TROTTER_QROM,
             rfq_spec=rfq_spec,
             save_q_state_vector=False,  # False when we are just drawing
+            use_for_loop_gate=True
         )
 
         stm_block = SuzukiTrotterMethodBlock(
@@ -218,8 +211,8 @@ class Parameters:
     def _make_evo_spec_for_running(self):
         rfq_spec = RfqPotentialSpec(
             self.wfr_spec,
-            elec_elec_potential,
-            elec_proton_potential,
+            self.elec_elec_potential,
+            self.elec_proton_potential,
             use_symmetry=self.use_symmetry,
             use_transpose=self.use_transpose,
             use_gray_code=self.use_gray_code,

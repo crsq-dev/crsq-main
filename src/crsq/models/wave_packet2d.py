@@ -2,7 +2,7 @@
 """
 
 import math
-import cupy as np
+import numpy
 
 
 class PsiWavePacket2:
@@ -15,13 +15,13 @@ class PsiWavePacket2:
         self._ky0 = ky0
         self._sigma = sigma
 
-    def __call__(self, qxv: np.ndarray, qyv: np.ndarray) -> np.ndarray:
+    def __call__(self, qxv: numpy.ndarray, qyv: numpy.ndarray) -> numpy.ndarray:
         sigma = self._sigma
         kx0 = self._kx0
         ky0 = self._ky0
         a = math.pow(1 / (math.pi * sigma * sigma), 0.25 * 2)
-        psi = a * np.exp(
-            -(np.square(qxv - self._qx0) + np.square(qyv - self._qy0))
+        psi = a * numpy.exp(
+            -(numpy.square(qxv - self._qx0) + numpy.square(qyv - self._qy0))
             / (2 * sigma * sigma)
             + (1j * (kx0 * qxv + ky0 * qyv))
         )

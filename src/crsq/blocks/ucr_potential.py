@@ -43,15 +43,15 @@ class UCRPotential2d(Frame):
         self,
         num_coord_bits: int,
         dq: float,
-        rfunc: Callable[[float, float], float],
+        rfunc2d: Callable[[float, float], float],
         build = True
     ):
-        super().__init__(label="RadialFuncGrayCodeQROM")
-        logger.info("start: RadialFuncGrayCodeQROM")
+        super().__init__(label="UCRPotential2d")
+        logger.info("start: UCRPotential2d")
         t1 = time.time()
         self._num_coord_bits = num_coord_bits
         self._dq = dq
-        self._rfunc = rfunc
+        self._rfunc2d = rfunc2d
         self._prepare_data()
         self.allocate_registers()
         if build:
@@ -59,20 +59,17 @@ class UCRPotential2d(Frame):
         t2 = time.time()
         dt = t2 - t1
         if dt > LOG_TIME_THRESH:
-            logger.info("end : RadialFuncGrayCodeQROM() %f msec", round(dt * 1000))
+            logger.info("end : UCRPotential2d %f msec", round(dt * 1000))
     
     def _prepare_data(self):
         n = self._num_coord_bits
         M = 1 << n
         self._data = np.ndarray(M*M, dtype = float)
         for i in range(M):
-            si = (i + M // 2) % M - (M // 2)
-            y = (si + 0.5) * self._dq
+            qy = i * self._dq
             for j in range(M):
-                sj = (j + M // 2) % M - (M // 2)
-                x = (sj + 0.5) * self._dq
-                r = math.sqrt(x * x + y * y)
-                psi = self._rfunc(r)
+                qx = j * self._dq
+                psi = self._rfunc2d(qx, qy)
                 if abs(psi) > math.pi:
                     logger.warning("x=%f, y=%f, r=%f, psi=%f", x, y, r, psi)
                 self._data[i*M + j] = -2.0 * psi

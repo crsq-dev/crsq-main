@@ -1,7 +1,6 @@
 import math, os, argparse
-import numpy as np
+import numpy
 import scipy.special as sp
-from matplotlib import pyplot as plt
 
 from crsq.blocks.antisymmetrization import AntisymmetrizationSpec
 from crsq.blocks.discretization import DiscretizationSpec
@@ -29,17 +28,17 @@ logger = logging.getLogger("TEV")
 # make one dimentional wave function data for H atom.
 
 
-def hydrogen1d_psi(xa: np.ndarray, x0: float, N: int):
+def hydrogen1d_psi(xa: numpy.ndarray, x0: float, N: int):
     hbar = 1
     me = 1
     qe = 1
     a0 = 1
     a0 = hbar * hbar / (me * qe * qe)
     x = xa - x0
-    absx = np.abs(x)
-    A = np.sqrt(2 / ((a0**3) * (N**5) * math.factorial(N) ** 2))
+    absx = numpy.abs(x)
+    A = numpy.sqrt(2 / ((a0**3) * (N**5) * math.factorial(N) ** 2))
     lg = sp.assoc_laguerre(2 * absx / (N * a0), N - 1, 1)
-    psi = A * x * np.exp(-absx / (N * a0)) * lg
+    psi = A * x * numpy.exp(-absx / (N * a0)) * lg
     return psi
 
 
@@ -61,7 +60,7 @@ def hydrogen1d_psi(xa: np.ndarray, x0: float, N: int):
 class Parameters:
 
     def hp_func(self, q: float) -> float:
-        r = np.abs(q - self.x0)
+        r = numpy.abs(q - self.x0)
         if r == 0:
             invr = 2/self.dq
         else:
@@ -114,7 +113,7 @@ class Parameters:
         )
 
         # series of x coordinates.
-        self.x = np.linspace(0, self.L - self.dq, self.M)
+        self.x = numpy.linspace(0, self.L - self.dq, self.M)
         # atom position
         # self.x0 = (self.M/2 + 0.5) * self.dq
         self.x0 = self.L / 2
@@ -272,11 +271,11 @@ class Parameters:
         logger.info("global phase at t=%f: %f", t, global_phase)
         q_state_label = self.evo_spec.make_state_vector_label(t)
         qsv: Statevector = result.data()[q_state_label]
-        phase_adjusted_qdata = qsv.data * np.exp(-1j * global_phase)
+        phase_adjusted_qdata = qsv.data * numpy.exp(-1j * global_phase)
         self.report.add_q_state_vector_file(t, qsv.dim, phase_adjusted_qdata)
         p_state_label = self.evo_spec.make_state_vector_label(t, "qft")
         psv: Statevector = result.data()[p_state_label]
-        phase_adjusted_pdata = psv.data * np.exp(-1j * global_phase)
+        phase_adjusted_pdata = psv.data * numpy.exp(-1j * global_phase)
         reordered_data = self._reverse_electron_bits(phase_adjusted_pdata)
         self.report.add_p_state_vector_file(t, psv.dim, reordered_data)
 
@@ -284,7 +283,7 @@ class Parameters:
         qc = self.stm_block.circuit
         n1 = self.wfr_spec.num_coordinate_bits
         M = 1 << n1
-        result = np.zeros(M, dtype=np.complex128)
+        result = numpy.zeros(M, dtype=numpy.complex128)
         for i in range(M):
             j = self._reverse_bit_index[i]
             result[j] = data[i]
