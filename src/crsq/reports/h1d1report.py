@@ -140,6 +140,12 @@ class H1D1Report:
         logger.info("norm(t=%d)=%f", t, norm)
         return data
 
+    def swapv(self, v):
+        if self._signed:
+            return np.concatenate([v[self._M // 2 :], v[: self._M // 2]])
+        else:
+            return v
+
     def add_wave_function_plot(
         self,
         time: float,
@@ -147,14 +153,18 @@ class H1D1Report:
         p_data: npt.NDArray[np.complex128],
     ):
         """Add a statevector to the report"""
-        ab = np.abs(q_data) / math.sqrt(self._dq)
-        re = np.real(q_data) / math.sqrt(self._dq)
-        im = np.imag(q_data) / math.sqrt(self._dq)
-        self._axs[0].plot(self._qv, ab, label=f"t={time:4.3f}")
-        self._axs[1].plot(self._qv, re, label=f"t={time:4.3f}")
-        self._axs[2].plot(self._qv, im, label=f"t={time:4.3f}")
+
+        sw_qv = self.swapv(self._qv)
+        sw_q_data = self.swapv(q_data)
+
+        ab = np.abs(sw_q_data) / math.sqrt(self._dq)
+        re = np.real(sw_q_data) / math.sqrt(self._dq)
+        im = np.imag(sw_q_data) / math.sqrt(self._dq)
+        self._axs[0].plot(sw_qv, ab, label=f"t={time:4.3f}")
+        self._axs[1].plot(sw_qv, re, label=f"t={time:4.3f}")
+        self._axs[2].plot(sw_qv, im, label=f"t={time:4.3f}")
         """ add a frame for the video """
-        self._produce_video_frame(time, q_data, p_data)
+        self._produce_video_frame(time, sw_q_data, p_data)
 
     def record_energy(self, t, q_data, p_data):
         Hk = np.sum(np.abs(p_data * np.conjugate(p_data)) * self._hkv).item()
@@ -182,30 +192,24 @@ class H1D1Report:
         fig.savefig(fname=filename)
         plt.close(fig)
 
-    def _produce_video_frame(self, t: float, q_data, p_data):
+    def _produce_video_frame(self, t: float, sw_q_data, p_data):
         fig, axs = plt.subplots(3, 1, figsize=(8, 12), layout="constrained")
         fig.suptitle(self._title + f" t={t:6.3f}")
-        self._produce_psiq_frame(t, axs[0], q_data)
+        self._produce_psiq_frame(t, axs[0], sw_q_data)
         self._produce_psip_frame(t, axs[1], p_data)
         self._produce_logpsip_frame(t, axs[2], p_data)
         filename = f"{self._frames_dir}/t_{t:06.3f}.png"
         print("writing to file : ", filename)
         fig.savefig(filename)
         plt.close(fig)
-    
-    def swapv(self, v):
-        if self._signed:
-            return np.concatenate([v[self._M // 2 :], v[: self._M // 2]])
-        else:
-            return v
 
     def _produce_psiq_frame(
-        self, t: float, ax: plt.Axes, q_data: npt.NDArray[np.complex128]
+        self, t: float, ax: plt.Axes, sw_q_data: npt.NDArray[np.complex128]
     ):
         ax.set_ylim([-1, 1])
         rdq = math.sqrt(self._dq)
         np_qv = self.swapv(self._qv)
-        np_psi5q = self.swapv(q_data)
+        np_psi5q = sw_q_data
         psi_label = "ψ(q)"
         ax.set_title(psi_label)
         ax.plot(np_qv, (1 / rdq) * np.abs(np_psi5q), label="|ψ(q)|")
