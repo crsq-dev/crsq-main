@@ -187,8 +187,13 @@ class ElectronMotionBlock(heap.Frame):
         #     # record after qft dagger
         #     self._save_state_vector_with_suffix("_qft")
 
-    def _build_elec_kinetic_step(self):
+    def build_elec_kinetic_block(self):
+        """ build a ElectronKineticBlock instance."""
         block = hamiltonian.ElectronKineticBlock(self._wfr_spec, self._disc_spec)
+        return block
+
+    def _build_elec_kinetic_step(self):
+        block = self.build_elec_kinetic_block()
         with check_time("ElectronKineticBlock.invoke"):
             self.invoke(block.bind(eregs=self._e_index_regs))
 

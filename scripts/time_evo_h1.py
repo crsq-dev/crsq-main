@@ -233,12 +233,18 @@ class Parameters:
 
             epbq = emb.build_elec_potential_block_qrom()
             self.report.add_circuit_diagram(epbq.circuit, "elec_potential_qrom")
+
+            ekbq = emb.build_elec_kinetic_block()
+            self.report.add_circuit_diagram(ekbq.circuit, "elec_kinetic")
         else:
             emb = stm_block.build_electron_motion_block(sim_time=0)
             self.report.add_circuit_diagram(emb.circuit, "elec_motion")
 
             epot = emb.build_elec_potential_block_arithmetic()
-            self.report.add_circuit_diagram(epot.circuit, "elec_potential")
+            self.report.add_circuit_diagram(epot.circuit, "elec_potential_arithmetic")
+
+            ekbq = emb.build_elec_kinetic_block()
+            self.report.add_circuit_diagram(ekbq.circuit, "elec_kinetic")
 
     def run_circuit(self):
         # run the simulator
