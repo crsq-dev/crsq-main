@@ -120,9 +120,14 @@ class RfqElectronPotentialBlock(heap.Frame):
             raise NotImplementedError("Moving nuclei are not implemented yet.")
         if wfr_spec.num_stationary_nuclei != 1:
             raise NotImplementedError("Stationary nuclei should be 1.")
-        X0, Y0 = ham_spec.nuclei_data[0]["pos"]
-        self._Q0 = [wfr_spec.delta_q * X0, wfr_spec.delta_q * Y0]
-        logger.info("RfqElectronPotentialBlock: X0 = %s, Y0 = %s, Q0=%s", X0, Y0, self._Q0)
+        if self._wfr_spec.dimension == 2:
+            X0, Y0 = ham_spec.nuclei_data[0]["pos"]
+            self._Q0 = [wfr_spec.delta_q * X0, wfr_spec.delta_q * Y0]
+            logger.info("RfqElectronPotentialBlock: X0 = %s, Y0 = %s, Q0=%s", X0, Y0, self._Q0)
+        else:
+            X0 = ham_spec.nuclei_data[0]["pos"]
+            self._Q0 = wfr_spec.delta_q * X0
+            logger.info("RfqElectronPotentialBlock: X0 = %s, Q0=%s", X0, self._Q0)
         if allocate:
             self.allocate_registers()
             if build:
