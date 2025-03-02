@@ -204,7 +204,7 @@ class Parameters:
         fname = self.outdir + "/" + self.evo_spec.make_state_vector_file_name(time)
         logger.info("Reading state vector data from: %s", fname)
         qc = self.stm_block.circuit
-        data2d = svec.extract_dist2d_from_file(qc, fname, "e0x", "e1x")
+        data2d = svec.extract_dist2d_from_file(qc, fname, "xq0", "xq1")
         logger.info("Reading done. producing png")
         ab = np.abs(data2d) / self.dq
         re = np.real(data2d) / self.dq
@@ -224,7 +224,7 @@ class Parameters:
         fname = self.outdir + "/" + self.evo_spec.make_state_vector_file_name(t)
         logger.info("Reading state vector data from: %s", fname)
         qc = self.stm_block.circuit
-        data2d = svec.extract_dist2d_from_file(qc, fname, "e0x", "e1x")
+        data2d = svec.extract_dist2d_from_file(qc, fname, "xq0", "xq1")
         logger.info("Reading done. producing png")
 
 #        par = self._par

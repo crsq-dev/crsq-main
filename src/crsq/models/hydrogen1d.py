@@ -56,9 +56,7 @@ class PsiH1D_Loudon:
         x = qv - self._Q0
         absx = numpy.abs(x)
         A = numpy.sqrt(2 / ((a0**3) * (N**5) * math.factorial(N) ** 2))
-        np_absx = numpy.asnumpy(absx)
-        np_lg = sp.assoc_laguerre(2 * np_absx / (N * a0), N - 1, 1)
-        lg = numpy.array(np_lg)
+        lg = sp.assoc_laguerre(2 * absx / (N * a0), N - 1, 1)
         if self._odd:
             psi = A * numpy.exp(-absx / (N * a0)) * x * lg
         else:

@@ -280,7 +280,7 @@ class Parameters:
                 logger.warning("state vector %s was not found", label)
 
     def _make_2d_data_from_ssv(self, circuit, ssv):
-        np_data2d = ssvec.extract_dist2d(circuit, ssv, "e0y", "e0x")
+        np_data2d = ssvec.extract_dist2d(circuit, ssv, "yq0", "xq0")
         return np_data2d
 
     def draw_graph(self):

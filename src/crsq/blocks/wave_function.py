@@ -115,21 +115,21 @@ class WaveFunctionRegisterSpec:
         for i in range(subset_size):
             dims = []
             for d in range(self._dimension):
-                dims.append(QuantumRegister(self._num_coordinate_bits, f"e{i}{dim_labels[d]}"))
+                dims.append(QuantumRegister(self._num_coordinate_bits, f"{dim_labels[d]}q{i}"))
             # add the spin register
             if self._use_spin:
-                dims.append(QuantumRegister(1, f"e{i}s"))
+                dims.append(QuantumRegister(1, f"sq{i}"))
             electrons.append(dims)
         return electrons
 
     def allocate_nucl_registers(self) -> List[List[QuantumRegister]]:
         """ allocate nucleus registers """
         nuclei = []
-        dim_labels='xyz'
+        dim_labels='XYZ'
         for i in range(self._num_moving_nuclei):
             dims = []
             for d in range(self._dimension):
-                dims.append(QuantumRegister(self._num_coordinate_bits, f"n{i}{dim_labels[d]}"))
+                dims.append(QuantumRegister(self._num_coordinate_bits, f"{dim_labels[d]}{i}q"))
             nuclei.append(dims)
         return nuclei
 

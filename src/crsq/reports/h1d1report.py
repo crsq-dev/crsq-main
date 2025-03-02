@@ -33,6 +33,7 @@ class H1D1Report:
         delta_t: float,
         num_elec_iters: int,
         num_nucl_iters: int,
+        signed: bool,
     ):
         self._outdir = outdir
         self._frames_dir = outdir + "/frames"
@@ -49,8 +50,18 @@ class H1D1Report:
         self._T = delta_t * num_elec_iters * num_nucl_iters
         self._num_elec_iters = num_elec_iters
         self._num_nucl_iters = num_nucl_iters
+        self._signed = signed
+        logger.info("signed: %s", self._signed)
         # x and qx values
-        self._xv = np.linspace(0, self._M - 1, self._M)
+        if self._signed:
+            self._xv = np.concatenate(
+                [
+                    np.linspace(0, self._L / 2 - self._dq, self._M // 2),
+                    np.linspace(-self._L / 2, -self._dq, self._M // 2),
+                ]
+            )
+        else:
+            self._xv = np.linspace(0, self._M - 1, self._M)
         self._qv = self._xv * self._dq
         # potential energy function
         self._hpv = np.ndarray(self._M, np.float64)
@@ -181,14 +192,20 @@ class H1D1Report:
         print("writing to file : ", filename)
         fig.savefig(filename)
         plt.close(fig)
+    
+    def swapv(self, v):
+        if self._signed:
+            return np.concatenate([v[self._M // 2 :], v[: self._M // 2]])
+        else:
+            return v
 
     def _produce_psiq_frame(
         self, t: float, ax: plt.Axes, q_data: npt.NDArray[np.complex128]
     ):
         ax.set_ylim([-1, 1])
         rdq = math.sqrt(self._dq)
-        np_qv = self._qv
-        np_psi5q = q_data
+        np_qv = self.swapv(self._qv)
+        np_psi5q = self.swapv(q_data)
         psi_label = "ψ(q)"
         ax.set_title(psi_label)
         ax.plot(np_qv, (1 / rdq) * np.abs(np_psi5q), label="|ψ(q)|")
@@ -242,7 +259,7 @@ class H1D1Report:
 
         rdp = math.sqrt(self._dp)
         psi4p = p_data / rdp  # scale psi
-        logpsi = 20*np.log10(np.abs(psi4p))
+        logpsi = 20 * np.log10(np.abs(psi4p))
         logp1 = logpsi[0:WM]
         logp2 = logpsi[M - WM : M]
         np_logp = np.concatenate([logp2, logp1])

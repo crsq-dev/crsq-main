@@ -90,6 +90,7 @@ class Parameters:
         num_nucl_iters=1,
         num_elec_iters=1,
         st_method=SUZUKI_TROTTER_ARITHMETIC,
+        signed=False,
         use_saved_data=False,
     ):
         self.outdir = outdir
@@ -107,16 +108,26 @@ class Parameters:
         self.num_nucl_iters = num_nucl_iters
         self.num_elec_iters = num_elec_iters
         self.st_method = st_method
+        self.signed = signed
         self.antisym_method = 3  # binary coded antisymmetrization method
         self.wfr_spec = WaveFunctionRegisterSpec(
             self.dim, self.n1, self.L, self.eta, self.Ln, self.Ls
         )
+        logger.info(f"Parameters.signed: {self.signed}")
 
-        # series of x coordinates.
-        self.x = numpy.linspace(0, self.L - self.dq, self.M)
-        # atom position
         # self.x0 = (self.M/2 + 0.5) * self.dq
-        self.x0 = self.L / 2
+        if self.signed:
+            # series of x coordinates.
+            self.x = numpy.concatenate(
+                [numpy.linspace(0, self.L//2 - self.dq, self.M//2), numpy.linspace(-self.L//2, -self.dq, self.M//2)]
+            )
+            # atom position
+            self.x0 = 0
+        else:
+            # series of x coordinates.
+            self.x = numpy.linspace(0, self.L - self.dq, self.M)
+            # atom position
+            self.x0 = self.L / 2
         logger.info("atom pos x0=%f", self.x0)
         self.psix = hydrogen1d_psi(self.x, self.x0, N=1)
         ini_electrons = [self.psix]
@@ -169,13 +180,14 @@ class Parameters:
         self.report = H1D1Report(
             outdir,
             title=f"H1D1 {self.device} {self.st_method} {self.precision} {self.n1}b dt{self.delta_t:.3f}",
-            num_coordinate_bits=n1,
+            num_coordinate_bits=self.n1,
             psi_axis_scale=0.6,
             space_length=self.L,
             hp_func=self.hp_func,
             delta_t=delta_t,
-            num_elec_iters=num_elec_iters,
-            num_nucl_iters=num_nucl_iters
+            num_elec_iters=self.num_elec_iters,
+            num_nucl_iters=self.num_nucl_iters,
+            signed=self.signed,
         )
 
     def _make_reverse_bit_index(self):
@@ -303,7 +315,7 @@ class Parameters:
 
     def _add_plot_from_file(self, time):
         qc = self.stm_block.circuit
-        bit_range = svec.get_bit_range_for_reg(qc, "e0x")
+        bit_range = svec.get_bit_range_for_reg(qc, "xq0")
         q_data = self.report.read_q_state_vector_file(time, bit_range)
         p_data = self.report.read_p_state_vector_file(time, bit_range)
         self.report.add_wave_function_plot(time, q_data, p_data)
@@ -333,16 +345,17 @@ if __name__ == "__main__":
         "--precision", type=str, choices=["double", "single"], required=True
     )
     parser.add_argument("--bits", type=int, required=True)
-    parser.add_argument("--num-nucl-iters", type=int, required=True)
+    parser.add_argument("--delta-t", type=float, required=True)
     parser.add_argument("--num-elec-iters", type=int, required=True)
+    parser.add_argument("--num-nucl-iters", type=int, required=True)
     parser.add_argument(
         "--st-method",
         type=str,
         choices=[SUZUKI_TROTTER_ARITHMETIC, SUZUKI_TROTTER_QROM],
         required=True
     )
+    parser.add_argument("--signed", type=str, choices=["True", "False"], required=True)
     parser.add_argument("--use-saved-data", type=str, choices=["True", "False"], required=True)
-    parser.add_argument("--delta-t", type=float, required=True)
     args = parser.parse_args()
 
     use_cuStateVec = "cuStateVec" if args.enable_cuStateVec == "True" else "statevector"
@@ -385,6 +398,7 @@ if __name__ == "__main__":
         args.num_nucl_iters,
         args.num_elec_iters,
         args.st_method,
+        args.signed == "True",
         args.use_saved_data == "True",
     )
     run_experiment(par, tag)
