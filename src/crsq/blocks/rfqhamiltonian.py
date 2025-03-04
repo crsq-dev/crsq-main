@@ -165,7 +165,8 @@ class RfqElectronPotentialBlock(heap.Frame):
         """ calculate -δt*Ven(q)/hbar
             -delta_t * Ven(q)
         """
-        r = abs(q - self._Q0)
+        L = self._wfr_spec.space_length
+        r = abs(((q - self._Q0) + L/2) % L - L/2)
         # logger.info("elec_nucl_phase_shift_1d: q = %f Q0 = %f r=%f", q, self._Q0, r)
         return -self._disc_spec.delta_t * self._rfq_spec.elec_nucl_potential_func(r)
 

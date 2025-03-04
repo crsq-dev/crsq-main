@@ -209,12 +209,12 @@ class H1D1Report:
         rdq = math.sqrt(self._dq)
         np_qv = self.swapv(self._x)
         np_psi5q = sw_q_data
-        psi_label = "ψ(q)"
+        psi_label = "ψ(x)"
         ax.set_title(psi_label)
-        ax.plot(np_qv, (1 / rdq) * np.abs(np_psi5q), label="|ψ(q)|")
-        ax.plot(np_qv, (1 / rdq) * np.real(np_psi5q), label="Re(ψ(q))")
-        ax.plot(np_qv, (1 / rdq) * np.imag(np_psi5q), label="Im(ψ(q))")
-        ax.set_xlabel("q")
+        ax.plot(np_qv, (1 / rdq) * np.abs(np_psi5q), label="|ψ(x)|")
+        ax.plot(np_qv, (1 / rdq) * np.real(np_psi5q), label="Re(ψ(x))")
+        ax.plot(np_qv, (1 / rdq) * np.imag(np_psi5q), label="Im(ψ(x))")
+        ax.set_xlabel("x")
         ax.set_ylabel("amplitude")
         ax.legend()
 
