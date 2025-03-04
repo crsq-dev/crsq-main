@@ -51,34 +51,33 @@ class H1D1Report:
         self._num_elec_iters = num_elec_iters
         self._num_nucl_iters = num_nucl_iters
         self._signed = signed
-        logger.info("signed: %s", self._signed)
         # x and qx values
         if self._signed:
-            self._xv = np.concatenate(
+            self._xq = np.concatenate(
                 [
-                    np.linspace(0, self._L / 2 - self._dq, self._M // 2),
-                    np.linspace(-self._L / 2, -self._dq, self._M // 2),
+                    np.linspace(0, self._M / 2 - 1, self._M // 2),
+                    np.linspace(-self._M / 2, -1, self._M // 2),
                 ]
             )
         else:
-            self._xv = np.linspace(0, self._M - 1, self._M)
-        self._qv = self._xv * self._dq
+            self._xq = np.linspace(0, self._M - 1, self._M)
+        self._x = self._xq * self._dq
         # potential energy function
         self._hpv = np.ndarray(self._M, np.float64)
         # hp_func cannot be applied to a numpy array
         for x in range(self._M):
             self._hpv[x] = self._hp_func(x * self._dq)
-        self._kv = np.concatenate(
+        self._kq = np.concatenate(
             [
                 np.linspace(0, self._M / 2 - 1, self._M // 2),
                 np.linspace(-self._M / 2, -1, self._M // 2),
             ]
         )
         self._dp = 2 * math.pi / self._L
-        self._pv = self._kv * self._dp
+        self._k = self._kq * self._dp
         me = 1.0
         # kinetic energy function
-        self._hkv = np.square(self._pv) / (2.0 * me)
+        self._hkv = np.square(self._k) / (2.0 * me)
         self._prepare_dir()
 
     def _prepare_dir(self) -> None:
@@ -154,7 +153,7 @@ class H1D1Report:
     ):
         """Add a statevector to the report"""
 
-        sw_qv = self.swapv(self._qv)
+        sw_qv = self.swapv(self._x)
         sw_q_data = self.swapv(q_data)
 
         ab = np.abs(sw_q_data) / math.sqrt(self._dq)
@@ -208,7 +207,7 @@ class H1D1Report:
     ):
         ax.set_ylim([-1, 1])
         rdq = math.sqrt(self._dq)
-        np_qv = self.swapv(self._qv)
+        np_qv = self.swapv(self._x)
         np_psi5q = sw_q_data
         psi_label = "ψ(q)"
         ax.set_title(psi_label)
@@ -228,8 +227,8 @@ class H1D1Report:
         M = self._M
         WM = self._WM
 
-        pv1 = self._pv[0:WM]
-        pv2 = self._pv[M - WM : M]
+        pv1 = self._k[0:WM]
+        pv2 = self._k[M - WM : M]
         np_pv = np.concatenate([pv2, pv1])
 
         rdp = math.sqrt(self._dp)
@@ -239,11 +238,11 @@ class H1D1Report:
         ps4p2 = psi4p[M - WM : M]
         np_psi4p = np.concatenate([ps4p2, ps4p1])
 
-        psi_label = "ψ\u0303(p)"
+        psi_label = "ψ\u0303(k)"
         ax.set_title(psi_label)
-        ax.plot(np_pv, np.abs(np_psi4p), label="|ψ\u0303(p)|")
-        ax.plot(np_pv, np.real(np_psi4p), label="Re(ψ\u0303(p))")
-        ax.plot(np_pv, np.imag(np_psi4p), label="Im(ψ\u0303(p))")
+        ax.plot(np_pv, np.abs(np_psi4p), label="|ψ\u0303(k)|")
+        ax.plot(np_pv, np.real(np_psi4p), label="Re(ψ\u0303(k))")
+        ax.plot(np_pv, np.imag(np_psi4p), label="Im(ψ\u0303(k))")
         # the xlabel will clash with the title of the third graph.
         # ax.set_xlabel('p')
         ax.set_ylabel("amplitude")
@@ -252,22 +251,23 @@ class H1D1Report:
     def _produce_logpsip_frame(
         self, t: float, ax: plt.Axes, p_data: npt.NDArray[np.complex128]
     ):
-        ax.set_ylim([-80, 0])  # log range -30 to 0
+        ax.set_ylim([1.0e-4, 1.0])  # log range -30 to 0
+        ax.set_yscale("log")
         ax.grid(True)
         M = self._M
         WM = self._WM
 
-        pv1 = self._pv[0:WM]
-        pv2 = self._pv[M - WM : M]
+        pv1 = self._k[0:WM]
+        pv2 = self._k[M - WM : M]
         np_pv = np.concatenate([pv2, pv1])
 
         rdp = math.sqrt(self._dp)
         psi4p = p_data / rdp  # scale psi
-        logpsi = 20 * np.log10(np.abs(psi4p))
-        logp1 = logpsi[0:WM]
-        logp2 = logpsi[M - WM : M]
-        np_logp = np.concatenate([logp2, logp1])
-        ax.plot(np_pv, np_logp, label="20log_10|ψ\u0303(p)|")
+        abspsi = np.abs(psi4p)
+        logp1 = abspsi[0:WM]
+        logp2 = abspsi[M - WM : M]
+        logp = np.concatenate([logp2, logp1])
+        ax.plot(np_pv, logp, label="|ψ\u0303(k)|")
 
         # logt = np.log2(self._tarray)
         # logt1 = logt[0:WM]
@@ -275,15 +275,18 @@ class H1D1Report:
         # np_logt = np.asnumpy(np.concatenate([logt2, logt1]))
         # ax.plot(np_pv, np_logt, label='log2(T)')
 
-        ax.set_title(f"20log_10|ψ\u0303(p)|")
+        ax.set_title(f"|ψ\u0303(k)|")
 
-        ax.set_xlabel("p [rad/bohr]")
-        ax.set_ylabel("dB")
+        ax.set_xlabel("k [rad/bohr]")
+        ax.set_ylabel("|ψ\u0303|")
         ax.legend()
 
     @property
     def tagname(self):
-        return f"ex0_{self._n1}b.{self._num_nucl_iters}n.{self._num_elec_iters}e"
+        slabel = "signed" if self._signed else "unsigned"
+        return (
+            f"ex0_{self._n1}b.{slabel}.{self._num_nucl_iters}n.{self._num_elec_iters}e"
+        )
 
     @property
     def moviefile(self):

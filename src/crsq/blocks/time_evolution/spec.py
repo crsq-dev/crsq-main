@@ -4,6 +4,9 @@ from qiskit.circuit import Parameter
 from crsq.blocks import (
     hamiltonian, discretization, wave_function, rfqhamiltonian
 )
+import logging
+
+logger = logging.getLogger(__name__)
 
 SUZUKI_TROTTER_ARITHMETIC='STAR'
 SUZUKI_TROTTER_QROM='STQR'
@@ -49,6 +52,9 @@ class TimeEvolutionSpec:
             raise ValueError("rfq_spec is required when method is SUZUKI_TROTTER_QROM")
         self._method = method
         self._rfq_spec = rfq_spec
+        logger.info(f"should_save_q_state_vector: {self._should_save_q_state_vector}")
+        logger.info(f"should_save_p_state_vector: {self._should_save_p_state_vector}")
+
 
     @property
     def should_use_for_loop_gate(self) -> bool:

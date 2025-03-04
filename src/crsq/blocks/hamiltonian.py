@@ -153,7 +153,6 @@ class PotentialBlockBase(heap.Frame):
             digit_weight = 2 ** (i - frac_bits)
             eta = charge2 * delta_t / delta_q
             qc.p(-eta * digit_weight, reg[i])
-            logger.info(f"P({i}) : charge2={charge2} eta={eta} dtheta={-eta * digit_weight}")
 
     def _allocate_singularity_exchange_registers(self):
         if not self._ham_spec.should_mask_potential_singularity:
@@ -282,7 +281,6 @@ class ElectronPotentialBlock(PotentialBlockBase):
                     x_d = pos[d]
                 else:
                     raise ValueError("pos is not tuple")
-                logger.info(f"stationary atom x_{d} = {x_d}")
                 dims.append(ext_scope.constant(x_d, n, signed=True))
             ast_nregs.append(dims)
 
