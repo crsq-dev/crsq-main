@@ -619,26 +619,6 @@ class SuzukiTrotterMethodBlock(heap.Frame):
             )
         return self._elec_motion_block
 
-
-
-
-
-    def qq__build_elec_potential_step(self):
-        block = self.qq_build_elec_potential_block()
-        with check_time("ElectronPotentialBlock.invoke"):
-            self.invoke(block.bind(eregs=self._e_index_regs, nregs=self._n_index_regs))
-
-    def qq_build_elec_potential_block(self, allocate=True, build=True):
-        """build a ElectronPotentialBlock instance."""
-        block = hamiltonian.ElectronPotentialBlock(
-            self._ham_spec, self._disc_spec, allocate=allocate, build=build
-        )
-        return block
-
-
-
-
-    # ☆☆☆
     def _build_elec_potential_step(self):
         method = self._evo_spec.method
         if method == spec.SUZUKI_TROTTER_ARITHMETIC:
@@ -691,12 +671,6 @@ class SuzukiTrotterMethodBlock(heap.Frame):
             build=build,
         )
         return block
-    # ☆☆☆
-
-
-
-
-
 
     def _build_apply_electron_qft_step(self, inverse: bool = False):
         """apply QFT on all index registers"""
