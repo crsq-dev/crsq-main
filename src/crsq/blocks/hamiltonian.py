@@ -59,6 +59,10 @@ class HamiltonianSpec:
             # qA = self._max_particle_charge
             self._num_v_numerator_int_bits = 1
             # self._num_v_numerator_int_bits = 1+int(2*math.log2(qA))
+        if wfr_spec.dimension == 1 and not isinstance(nuclei_data[0]['pos'], int):
+            raise ValueError("nuclei_data[0]['pos'] is not int")
+        elif wfr_spec.dimension > 1 and not isinstance(nuclei_data[0]['pos'][0], int):
+            raise ValueError("nuclei_data[0]['pos'][0] is not int")
         logger.info(
             "HamiltonianSpec: max_particle_charge = %f", self._max_particle_charge
         )
