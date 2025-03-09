@@ -29,6 +29,7 @@ class H1D1Report:
         num_coordinate_bits: int,
         psi_axis_scale: float,
         space_length: float,
+        window_radius: int,
         hp_func: Callable[[float], float],
         delta_t: float,
         num_elec_iters: int,
@@ -40,7 +41,7 @@ class H1D1Report:
         self._title = title
         self._n1 = num_coordinate_bits
         self._M = 1 << self._n1
-        self._WM = self._M // 2
+        self._WM = window_radius
         self._L = space_length
         self._hp_func = hp_func
         self._dq = self._L / self._M
