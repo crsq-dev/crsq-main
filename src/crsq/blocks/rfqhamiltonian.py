@@ -120,14 +120,20 @@ class RfqElectronPotentialBlock(heap.Frame):
             raise NotImplementedError("Moving nuclei are not implemented yet.")
         if wfr_spec.num_stationary_nuclei != 1:
             raise NotImplementedError("Stationary nuclei should be 1.")
-        if self._wfr_spec.dimension == 2:
-            X0, Y0 = ham_spec.nuclei_data[0]["pos"]
-            self._Q0 = [wfr_spec.delta_q * X0, wfr_spec.delta_q * Y0]
-            logger.info("RfqElectronPotentialBlock: X0 = %s, Y0 = %s, Q0=%s", X0, Y0, self._Q0)
+        if wfr_spec.dimension == 3:
+            Xq0, Yq0, Zq0 = ham_spec.nuclei_data[0]["pos"]
+            self._Q0 = [wfr_spec.delta_q * Xq0, wfr_spec.delta_q * Yq0, wfr_spec.delta_q * Zq0]
+            logger.info("RfqElectronPotentialBlock: Xq0 = %d, Yq0 = %d, Zq0 = %d, Q0=%s", Xq0, Yq0, Zq0, self._Q0)
+        elif wfr_spec.dimension == 2:
+            Xq0, Yq0 = ham_spec.nuclei_data[0]["pos"]
+            self._Q0 = [wfr_spec.delta_q * Xq0, wfr_spec.delta_q * Yq0]
+            logger.info("RfqElectronPotentialBlock: Xq0 = %d, Yq0 = %d, Q0=%s", Xq0, Yq0, self._Q0)
+        elif wfr_spec.dimension == 1:
+            Xq0 = ham_spec.nuclei_data[0]["pos"]
+            self._Q0 = wfr_spec.delta_q * Xq0
+            logger.info("RfqElectronPotentialBlock: Xq0 = %d, Q0=%s", Xq0, self._Q0)
         else:
-            X0 = ham_spec.nuclei_data[0]["pos"]
-            self._Q0 = wfr_spec.delta_q * X0
-            logger.info("RfqElectronPotentialBlock: X0 = %s, Q0=%s", X0, self._Q0)
+            raise NotImplementedError("Dimension > 2 is not implemented yet.")
         if allocate:
             self.allocate_registers()
             if build:
@@ -179,12 +185,24 @@ class RfqElectronPotentialBlock(heap.Frame):
         r = math.sqrt(dqx*dqx + dqy*dqy)
         return -self._disc_spec.delta_t * self._rfq_spec.elec_nucl_potential_func(r)
 
+    def _elec_nucl_phase_shift_3d(self, qx: float, qy:float, qz:float):
+        """ calculate -δt*Ven(q)/hbar
+            -delta_t * Ven(q)
+        """
+        dqx = qx - self._Q0[0]
+        dqy = qy - self._Q0[1]
+        dqz = qz - self._Q0[2]
+        r = math.sqrt(dqx*dqx + dqy*dqy + dqz*dqz)
+        return -self._disc_spec.delta_t * self._rfq_spec.elec_nucl_potential_func(r)
+
     def _build_elec_elec_potential_terms(self):
         wfr_spec = self._wfr_spec
         if wfr_spec.dimension == 1:
             self._build_elec_elec_potential_terms_1d()
         elif wfr_spec.dimension == 2:
             self._build_elec_elec_potential_terms_2d()
+        elif wfr_spec.dimension == 3:
+            self._build_elec_elec_potential_terms_3d()
         else:
             raise NotImplementedError("Dimension > 2 is not implemented yet.")
 
@@ -210,19 +228,6 @@ class RfqElectronPotentialBlock(heap.Frame):
                 dt = time.time() - t1
                 if dt > LOG_TIME_THRESH:
                     logger.info("  Vee(%d,%d) done. %d msec", ie, ih, round(dt * 1000))
-
-    def _apply_radial_func_qrom_1d(self, xr: ast.Register, v_phase_shift_func):
-        wfr_spec = self._wfr_spec
-        rfq_spec = self._rfq_spec
-        if rfq_spec.should_use_gray_code:
-            rfgcq1d = ucr_potential.UCRPotential1d(
-                wfr_spec.num_coordinate_bits, wfr_spec.delta_q, v_phase_shift_func
-            )
-            self.invoke(rfgcq1d.bind(x=xr.register, target=self._target))
-        else:
-            raise NotImplementedError(
-                "1D radial function QROM without graycode is not implemented yet."
-            )
 
     def _build_elec_elec_potential_terms_2d(self):
         logger.info("_build_elec_elec_potential_terms_2d")
@@ -250,6 +255,48 @@ class RfqElectronPotentialBlock(heap.Frame):
                 if dt > LOG_TIME_THRESH:
                     logger.info("  Vee(%d,%d) done. %d msec", ie, ih, round(dt * 1000))
 
+    def _build_elec_elec_potential_terms_3d(self):
+        logger.info("_build_elec_elec_potential_terms_3d")
+        wfr_spec = self._wfr_spec
+        for ie in range(wfr_spec.num_electrons):
+            for ih in range(ie + 1, wfr_spec.num_electrons):
+                t1 = time.time()
+                # electron-electron potential term
+                scope: ast.Scope = ast.new_scope(self)
+                x1r = scope.register(self._eregs[ie][0], signed=True)
+                y1r = scope.register(self._eregs[ie][1], signed=True)
+                z1r = scope.register(self._eregs[ie][2], signed=True)
+                x2r = scope.register(self._eregs[ih][0], signed=True)
+                y2r = scope.register(self._eregs[ih][1], signed=True)
+                z2r = scope.register(self._eregs[ih][2], signed=True)
+                x1r -= x2r
+                y1r -= y2r
+                z1r -= z2r
+                scope.build_circuit()
+
+                self._apply_radial_func_qrom_3d(x1r, y1r, z1r, self._elec_elec_phase_shift_2d)
+
+                scope.build_inverse_circuit()
+
+                scope.close()
+
+                dt = time.time() - t1
+                if dt > LOG_TIME_THRESH:
+                    logger.info("  Vee(%d,%d) done. %d msec", ie, ih, round(dt * 1000))
+
+    def _apply_radial_func_qrom_1d(self, xr: ast.Register, v_phase_shift_func):
+        wfr_spec = self._wfr_spec
+        rfq_spec = self._rfq_spec
+        if rfq_spec.should_use_gray_code:
+            rfgcq1d = ucr_potential.UCRPotential1d(
+                wfr_spec.num_coordinate_bits, wfr_spec.delta_q, v_phase_shift_func
+            )
+            self.invoke(rfgcq1d.bind(x=xr.register, target=self._target))
+        else:
+            raise NotImplementedError(
+                "1D radial function QROM without graycode is not implemented yet."
+            )
+
     def _apply_radial_func_qrom_2d(self, xr: ast.Register, yr: ast.Register, rfunc2d: Callable[[float, float], float]):
         wfr_spec = self._wfr_spec
         rfq_spec = self._rfq_spec
@@ -270,6 +317,18 @@ class RfqElectronPotentialBlock(heap.Frame):
                 rfq.bind(x=xr.register, y=yr.register), invoke_as_instruction=True
             )
 
+    def _apply_radial_func_qrom_3d(self, xr: ast.Register, yr: ast.Register, zr: ast.Register, rfunc3d: Callable[[float, float, float], float]):
+        wfr_spec = self._wfr_spec
+        rfq_spec = self._rfq_spec
+        if rfq_spec.should_use_gray_code:
+            rfgcq = ucr_potential.UCRPotential3d(
+                wfr_spec.num_coordinate_bits, wfr_spec.delta_q, rfunc3d
+            )
+            self.invoke(rfgcq.bind(x=xr.register, y=yr.register, z=zr.register, target=self._target))
+        else:
+            raise NotImplementedError(
+                "3D radial function QROM without graycode is not implemented yet.")
+
     def _build_elec_nucl_potential_terms(self):
         wfr_spec = self._wfr_spec
         logger.info("_build_elec_nucl_potential_terms dimension=%d", wfr_spec.dimension)
@@ -277,6 +336,8 @@ class RfqElectronPotentialBlock(heap.Frame):
             self._build_elec_nucl_potential_terms_1d()
         elif wfr_spec.dimension == 2:
             self._build_elec_nucl_potential_terms_2d()
+        elif wfr_spec.dimension == 3:
+            self._build_elec_nucl_potential_terms_3d()
         else:
             raise NotImplementedError("Dimension > 2 is not implemented yet.")
 
@@ -326,6 +387,36 @@ class RfqElectronPotentialBlock(heap.Frame):
                 scope.build_circuit()
 
                 self._apply_radial_func_qrom_2d(exr, eyr, self._elec_nucl_phase_shift_2d)
+
+                scope.build_inverse_circuit()
+
+                scope.close()
+
+                dt = time.time() - t1
+                if dt > LOG_TIME_THRESH:
+                    logger.info("  Ven(%d,%d) done. %d msec", ie, ia, round(dt * 1000))
+
+    def _build_elec_nucl_potential_terms_3d(self):
+        logger.info("_build_elec_nucl_potential_terms_3d")
+        wfr_spec = self._wfr_spec
+        ham_spec = self._ham_spec
+        nuclei_data = ham_spec.nuclei_data
+        num_moving_nuclei = wfr_spec.num_moving_nuclei
+        # TODO : moving atoms are not implemented yet.
+        for ie in range(wfr_spec.num_electrons):
+            for ia in range(wfr_spec.num_stationary_nuclei):
+                t1 = time.time()
+                scope: ast.Scope = ast.new_scope(self)
+                exr = scope.register(self._eregs[ie][0], signed=True)
+                eyr = scope.register(self._eregs[ie][1], signed=True)
+                ezr = scope.register(self._eregs[ie][2], signed=True)
+                ndata = nuclei_data[num_moving_nuclei + ia]
+                pos = ndata["pos"]
+                # we don't need subtractions here because the UCR data
+                # takes into concern the position of the nucleus.
+                scope.build_circuit()
+
+                self._apply_radial_func_qrom_3d(exr, eyr, ezr, self._elec_nucl_phase_shift_3d)
 
                 scope.build_inverse_circuit()
 
