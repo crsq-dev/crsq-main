@@ -70,36 +70,28 @@ class H1D2Report:
         self._num_nucl_iters = num_nucl_iters
 
         # x,y and qx,qy values
-        self._xv = numpy.zeros((M, M))
-        self._yv = numpy.zeros((M, M))
+        self._xq = numpy.zeros((M, M))
+        self._yq = numpy.zeros((M, M))
         for i in range(M):
-            self._yv[:, i] = numpy.linspace(0, M - 1, M)
-            self._xv[i, :] = numpy.linspace(0, M - 1, M)
+            self._yq[:, i] = numpy.linspace(0, M - 1, M)
+            self._xq[i, :] = numpy.linspace(0, M - 1, M)
         dq = self._dq
-        self._qxv = self._xv * dq
-        self._qyv = self._yv * dq
+        self._x = self._xq * dq
+        self._y = self._yq * dq
         # potential energy
-
-        # works for time_evo_2d_h1.py:
-        self._hpv = self._hp_func(self._qxv, self._qyv)
-
-        # works for time_evo_classical_2d_h1.py:
-        # self._hpv = numpy.ndarray((self._M, self._M), numpy.float64)
-        # for x in range(self._M):
-        #     for y in range(self._M):
-        #         self._hpv[x, y] = self._hp_func(x * dq, y * dq)
-
+        self._hp = self._hp_func(self._x, self._y)
         # discretized wave number values
-        kv = numpy.mod(numpy.linspace(-M // 2, M // 2 - 1, M), M) - (M // 2)
-        kv2 = numpy.square(kv)
-        self._kxv2 = numpy.zeros((M, M))
-        self._kyv2 = numpy.zeros((M, M))
+        kq = numpy.mod(numpy.linspace(-M // 2, M // 2 - 1, M), M) - (M // 2)
+        kq2 = numpy.square(kq)
+        self._kxq2 = numpy.zeros((M, M))
+        self._kyq2 = numpy.zeros((M, M))
         for i in range(M):
-            self._kyv2[:, i] = kv2
-            self._kxv2[i, :] = kv2
-        self._kv2 = self._kxv2 + self._kyv2
+            self._kyq2[:, i] = kq2
+            self._kxq2[i, :] = kq2
+        self._kq2 = self._kxq2 + self._kyq2
         dp = 2 * math.pi / self._L
-        self._hkv = self._kv2 * (dp * dp / 2.0)
+        self._k2 = self._kq2 * (dp*dp)
+        self._hk = self._k2 / 2.0
 
         self._prepare_dir()
 
@@ -240,8 +232,8 @@ class H1D2Report:
         ax.set_zlim3d(self._zmin, self._zmax)
         ax.set_xlabel("y")
         ax.set_ylabel("x")
-        np_qxv = self._qxv
-        np_qyv = self._qyv
+        np_qxv = self._x
+        np_qyv = self._y
         ax.plot_surface(
             np_qyv,
             np_qxv,
@@ -270,8 +262,8 @@ class H1D2Report:
         ax.set_zlim3d(self._zmin, self._zmax)
         ax.set_xlabel("y")
         ax.set_ylabel("x")
-        np_qxv = self._qxv
-        np_qyv = self._qyv
+        np_qxv = self._x
+        np_qyv = self._y
         ax.plot_surface(
             np_qyv,
             np_qxv,
@@ -299,8 +291,8 @@ class H1D2Report:
         ax.set_xlabel("y")
         ax.set_ylabel("x")
 
-        np_qyv = self._qyv
-        np_qxv = self._qxv
+        np_qyv = self._y
+        np_qxv = self._x
         ax.plot_surface(
             np_qyv,
             np_qxv,
@@ -345,8 +337,10 @@ class H1D2Report:
         plt.close(fig)
 
     def record_energy(self, t, q_data, p_data):
-        Hk = numpy.sum(numpy.abs(p_data * numpy.conjugate(p_data)) * self._hkv).item()
-        Hp = numpy.sum(numpy.abs(q_data * numpy.conjugate(q_data)) * self._hpv).item()
+        Hk = numpy.sum(numpy.abs(p_data * numpy.conjugate(p_data)) * self._hk).item()
+        Hp = numpy.sum(numpy.abs(q_data * numpy.conjugate(q_data)) * self._hp).item()
+        Htot = Hk + Hp
+        logger.info("t=%f, Hk=%f, Hp=%f, Htot=%f", t, Hk, Hp, Htot)
         self._trace_time.append(t)
         self._hk_trace.append(Hk)
         self._hp_trace.append(Hp)

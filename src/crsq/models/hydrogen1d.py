@@ -9,7 +9,7 @@ import scipy.special as sp
 class VHAtom:
     """V(x) for H atom. potential function object"""
 
-    def __init__(self, Q0: float, inv0: float, Z: float):
+    def __init__(self, Q0: float, dq: float, Z: float):
         """
         Args:
             Q0: float : center of the potential
@@ -17,18 +17,18 @@ class VHAtom:
             Z: float : charge of the nucleus
         """
         self._Q0 = Q0
-        self._inv0 = inv0
+        self._dq = dq
         self._Z = Z
 
-    def __call__(self, qv: npyt.NDArray[numpy.float64]) -> npyt.NDArray[numpy.float64]:
+    def __call__(self, x: npyt.NDArray[numpy.float64]) -> npyt.NDArray[numpy.float64]:
         # riA は、各格子点での原子核までの距離単位は格子間隔。
-        riA = numpy.abs(numpy.subtract(qv, self._Q0))
+        riA = numpy.abs(numpy.subtract(x, self._Q0))
+        # ゼロ除算を防ぐために、ゼロになるところは 1/r を inv0 で置き換える。
+        xq0 = int(self._Q0 / self._dq)
+        riA[xq0] = self._dq / 2
         qe = -1
         QA = self._Z
-        # ゼロ除算を防ぐために、ゼロになるところは 1/r を inv0 で置き換える。
-        zero_index = numpy.where(riA == 0)[0]
-        varray = numpy.divide(qe * QA, riA)
-        varray[zero_index] = qe * QA * self._inv0
+        varray = (qe*QA) / riA
         return varray
 
     @property
@@ -83,7 +83,7 @@ class PsiH1D_Palma:
         self._Q0 = Q0
         self._N = N
         if N <= 0:
-            raise ValueError(f"N must be positive integer, but {N} is given.")
+            raise ValueError(f"N must be a non-negative integer, but {N} is given.")
 
     def __call__(self, qv: numpy.ndarray) -> numpy.ndarray:
         N = self._N  # primary quantum number
@@ -94,15 +94,14 @@ class PsiH1D_Palma:
         a0 = hbar**2 / (me * qe**2)
         z = (2 / N / a0) * (qv - self._Q0)
         absz = numpy.abs(z)
-        np_absz = numpy.asnumpy(absz)
         An = (
             (-1) ** N
-            * numpy.sqrt(2 * N * a0)
+            * math.sqrt(2 * N * a0)
             / (math.factorial(N) * (N**3) * (a0**2))
             * (N * a0)
             / 2
         )
-        np_lg = sp.assoc_laguerre(np_absz, N - 1, 1)
+        np_lg = sp.assoc_laguerre(absz, N - 1, 1)
         lg = numpy.array(np_lg)
         psi = An * z * numpy.exp(-absz / 2) * lg
         return psi
@@ -114,3 +113,7 @@ class PsiH1D_Palma:
     @property
     def name(self):
         return f"H1D_P_{self._N}_Q0_{self._Q0}"
+
+    @property
+    def eigen_value(self):
+        return -1 / 2 * self._N**2

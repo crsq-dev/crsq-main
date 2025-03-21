@@ -66,8 +66,8 @@ class H1D1Report:
         # potential energy function
         self._hpv = np.ndarray(self._M, np.float64)
         # hp_func cannot be applied to a numpy array
-        for x in range(self._M):
-            self._hpv[x] = self._hp_func(x * self._dq)
+        for i in range(self._M):
+            self._hpv[i] = self._hp_func(self._x[i])
         self._kq = np.concatenate(
             [
                 np.linspace(0, self._M / 2 - 1, self._M // 2),
@@ -169,6 +169,8 @@ class H1D1Report:
     def record_energy(self, t, q_data, p_data):
         Hk = np.sum(np.abs(p_data * np.conjugate(p_data)) * self._hkv).item()
         Hp = np.sum(np.abs(q_data * np.conjugate(q_data)) * self._hpv).item()
+        Htot = Hk + Hp
+        logger.info("t=%f, Hk=%f, Hp=%f, Htot=%f", t, Hk, Hp, Htot)
         self._trace_time.append(t)
         self._hk_trace.append(Hk)
         self._hp_trace.append(Hp)

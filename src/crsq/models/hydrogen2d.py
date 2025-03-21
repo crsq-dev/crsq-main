@@ -73,6 +73,11 @@ class PsiH2D:
     def name(self):
         return f'H2D_n_{self._n}_m_{self._m}_q0_{self._Qx0}_{self._Qy0}'
 
+    @property
+    def eigen_value(self):
+        # Parfitt uses Rydberg energy units, which are double the Bohr energy units
+        return -1/(2*(self._n+1/2)**2)
+
 class VHAtom2:
     """V(x) for H atom. potential function object - 2D version"""
 
@@ -82,11 +87,11 @@ class VHAtom2:
         self._dq = dq
         self._Z = Z
 
-    def __call__(self, qxv: numpy.ndarray, qyv: numpy.ndarray) -> numpy.ndarray:
+    def __call__(self, x: numpy.ndarray, y: numpy.ndarray) -> numpy.ndarray:
         riA = numpy.sqrt(
             (
-                numpy.square(qxv - self._Qx0)
-                + numpy.square(qyv - self._Qy0)
+                numpy.square(x - self._Qx0)
+                + numpy.square(y - self._Qy0)
             )
         )
         xq0 = int(self._Qx0 / self._dq)
