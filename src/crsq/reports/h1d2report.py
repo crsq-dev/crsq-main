@@ -81,7 +81,17 @@ class H1D2Report:
         # potential energy
         self._hp = self._hp_func(self._x, self._y)
         # discretized wave number values
+
         kq = numpy.mod(numpy.linspace(-M // 2, M // 2 - 1, M), M) - (M // 2)
+        self._kxq = numpy.zeros((M, M))
+        self._kyq = numpy.zeros((M, M))
+        for i in range(M):
+            self._kyq[:, i] = kq
+            self._kxq[i, :] = kq
+        dk = math.pi / self._L
+        self._ky = self._kyq * dk
+        self._kx = self._kxq * dk
+
         kq2 = numpy.square(kq)
         self._kxq2 = numpy.zeros((M, M))
         self._kyq2 = numpy.zeros((M, M))
@@ -89,6 +99,7 @@ class H1D2Report:
             self._kyq2[:, i] = kq2
             self._kxq2[i, :] = kq2
         self._kq2 = self._kxq2 + self._kyq2
+
         dp = 2 * math.pi / self._L
         self._k2 = self._kq2 * (dp*dp)
         self._hk = self._k2 / 2.0
@@ -183,6 +194,8 @@ class H1D2Report:
             self.produce_frame3d_re(t, q_data)
         elif self._plot_type == "3d-3":
             self.produce_frame3d3(t, q_data)
+        elif self._plot_type == "3d-3qp":
+            self.produce_frame3d3qp(t, q_data, p_data)
         else:
             raise ValueError(f"Unknown plot type : {self._plot_type}")
 
@@ -282,6 +295,26 @@ class H1D2Report:
         fig, axs = plt.subplots(
             1, 3, subplot_kw={"projection": "3d"}, figsize=(15, 6), layout="constrained"
         )
+        self._produce_frame3d3q(t, q_data, axs)
+        fig.suptitle(self._title + f" t={t:6.3f}")
+        filename = f"{self._frames_dir}/t_{t:06.3f}.png"
+        print("writing to file : ", filename)
+        fig.savefig(filename)
+        plt.close(fig)
+    
+    def produce_frame3d3qp(self, t: float, q_data: npt.NDArray[numpy.complex128], p_data: npt.NDArray[numpy.complex128]) -> None:
+        fig, axs = plt.subplots(
+            2, 3, subplot_kw={"projection": "3d"}, figsize=(15, 12), layout="constrained"
+        )
+        self._produce_frame3d3q(t, q_data, axs[0,:])
+        self._produce_frame3d3p(t, p_data, axs[1,:])
+        fig.suptitle(self._title + f" t={t:6.3f}")
+        filename = f"{self._frames_dir}/t_{t:06.3f}.png"
+        print("writing to file : ", filename)
+        fig.savefig(filename)
+        plt.close(fig)
+
+    def _produce_frame3d3q(self, t: float, q_data: npt.NDArray[numpy.complex128], axs) -> None:
         colormap = plt.get_cmap(self._colormap_name)
         dq = self._dq
 
@@ -330,11 +363,54 @@ class H1D2Report:
             vmax=self._vmax,
         )
 
-        fig.suptitle(self._title + f" t={t:6.3f}")
-        filename = f"{self._frames_dir}/t_{t:06.3f}.png"
-        print("writing to file : ", filename)
-        fig.savefig(filename)
-        plt.close(fig)
+    def _produce_frame3d3p(self, t: float, p_data: npt.NDArray[numpy.complex128], axs) -> None:
+        colormap = plt.get_cmap(self._colormap_name)
+        dq = self._dq
+
+        ax: plt.Axes = axs[0]
+        ax.set_title("|ψ\u0303|")
+        ax.set_zlim3d(self._zmin, self._zmax)
+        ax.set_xlabel("ky")
+        ax.set_ylabel("kx")
+
+        np_ky = self._ky
+        np_kx = self._kx
+        ax.plot_surface(
+            np_ky,
+            np_kx,
+            (1 / dq) * numpy.abs(p_data),
+            cmap=colormap,
+            vmin=self._vmin,
+            vmax=self._vmax,
+        )
+
+        ax = axs[1]
+        ax.set_title("Re(ψ\u0303)")
+        ax.set_zlim3d(self._zmin, self._zmax)
+        ax.set_xlabel("ky")
+        ax.set_ylabel("kx")
+        ax.plot_surface(
+            np_ky,
+            np_kx,
+            (1 / dq) * numpy.real(p_data),
+            cmap=colormap,
+            vmin=self._vmin,
+            vmax=self._vmax,
+        )
+
+        ax = axs[2]
+        ax.set_title("Im(ψ\u0303)")
+        ax.set_zlim3d(self._zmin, self._zmax)
+        ax.set_xlabel("ky")
+        ax.set_ylabel("kx")
+        ax.plot_surface(
+            np_ky,
+            np_kx,
+            (1 / dq) * numpy.imag(p_data),
+            cmap=colormap,
+            vmin=self._vmin,
+            vmax=self._vmax,
+        )
 
     def record_energy(self, t, q_data, p_data):
         Hk = numpy.sum(numpy.abs(p_data * numpy.conjugate(p_data)) * self._hk).item()

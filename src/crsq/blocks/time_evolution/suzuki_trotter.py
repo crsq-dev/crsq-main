@@ -87,7 +87,8 @@ class ElectronMotionBlock(heap.Frame):
             # additionally, we want to allocate padding registers when saving state vector.
             # so that the circuit size will match the total outer-most circuit size.
             if evo_spec.should_save_p_state_vector and self._is_last_elec_iter:
-                padding_bits = (wfr_spec.num_coordinate_bits - 1) * wfr_spec.dimension
+                padding_bits = wfr_spec.num_coordinate_bits * wfr_spec.dimension - 1
+                logger.info("Allocating padding registers: %d bits", padding_bits)
                 self._padding_regs = QuantumRegister(padding_bits, "pad")
                 self.add_local(self._padding_regs)
 

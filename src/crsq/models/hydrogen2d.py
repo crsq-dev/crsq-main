@@ -77,17 +77,41 @@ class PsiH2D:
     def eigen_value(self):
         # Parfitt uses Rydberg energy units, which are double the Bohr energy units
         return -1/(2*(self._n+1/2)**2)
+    
+    @property
+    def n(self):
+        return self._n
+    
+    @property
+    def m(self):
+        return self._m
+    
+    @property
+    def r0(self):
+        if self._m > 0:
+            return self._dq / 2
+        else:
+            q0 = 1/(self._n+1/2)
+            dq = self._dq
+            if self._n == 0:
+                return dq*dq*q0/4/(-math.exp(-q0*dq)+1)
+            else:
+                return dq*dq*q0/4/((-1+q0*q0*dq*dq)*math.exp(-q0*dq)+1)
 
 class VHAtom2:
     """V(x) for H atom. potential function object - 2D version"""
 
-    def __init__(self, Qx0: float, Qy0: float, dq: float, Z: float):
+    def __init__(self, Qx0: float, Qy0: float, dq: float, r0: float, Z: float):
         self._Qx0 = Qx0
         self._Qy0 = Qy0
         self._dq = dq
+        self._r0 = r0
         self._Z = Z
+        logger.info("VHAtom2.__init__:   dq = %f, r0=%f", dq, r0)
+
 
     def __call__(self, x: numpy.ndarray, y: numpy.ndarray) -> numpy.ndarray:
+        logger.info("VHAtom2.__call__")
         riA = numpy.sqrt(
             (
                 numpy.square(x - self._Qx0)
@@ -96,7 +120,7 @@ class VHAtom2:
         )
         xq0 = int(self._Qx0 / self._dq)
         yq0 = int(self._Qy0 / self._dq)
-        riA[xq0, yq0] = self._dq / 2
+        riA[xq0, yq0] = self._r0
         qe = -1
         QA = self._Z
         varray = (qe * QA) / riA

@@ -117,7 +117,7 @@ class Parameters:
             vmin=-0.2,
             vmax=0.2,
             space_length=self.L,
-            hp_func=hydrogen2d.VHAtom2(self.L/2, self.L/2, self.dq, Z=1),
+            hp_func=hydrogen2d.VHAtom2(self.L/2, self.L/2, self.dq, r0=self.psifunc2d.r0, Z=1),
             delta_t=self.delta_t,
             num_elec_iters=self.num_elec_iters,
             num_nucl_iters=self.num_nucl_iters
