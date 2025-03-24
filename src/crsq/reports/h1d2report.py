@@ -82,22 +82,26 @@ class H1D2Report:
         self._hp = self._hp_func(self._x, self._y)
         # discretized wave number values
 
-        kq = numpy.mod(numpy.linspace(-M // 2, M // 2 - 1, M), M) - (M // 2)
-        self._kxq = numpy.zeros((M, M))
-        self._kyq = numpy.zeros((M, M))
-        for i in range(M):
-            self._kyq[:, i] = kq
-            self._kxq[i, :] = kq
+        kq = numpy.linspace(-M // 2, M // 2 - 1, M)
+        self._kxq, self._kyq = numpy.meshgrid(kq, kq)
+
+        # self._kxq = numpy.zeros((M, M))
+        # self._kyq = numpy.zeros((M, M))
+        # for i in range(M):
+        #     self._kyq[:, i] = kq
+        #     self._kxq[i, :] = kq
+
         dk = math.pi / self._L
         self._ky = self._kyq * dk
         self._kx = self._kxq * dk
 
         kq2 = numpy.square(kq)
-        self._kxq2 = numpy.zeros((M, M))
-        self._kyq2 = numpy.zeros((M, M))
-        for i in range(M):
-            self._kyq2[:, i] = kq2
-            self._kxq2[i, :] = kq2
+        self._kxq2, self._kyq2 = numpy.meshgrid(kq2, kq2)
+        # self._kxq2 = numpy.zeros((M, M))
+        # self._kyq2 = numpy.zeros((M, M))
+        # for i in range(M):
+        #     self._kyq2[:, i] = kq2
+        #     self._kxq2[i, :] = kq2
         self._kq2 = self._kxq2 + self._kyq2
 
         dp = 2 * math.pi / self._L
@@ -186,8 +190,9 @@ class H1D2Report:
         p_data: npt.NDArray[numpy.complex128],
     ) -> None:
         """ """
+        p_data_shifted = self._shift_p_data(p_data)
         if self._plot_type == "2d":
-            self.produce_frame2d(t, q_data, p_data)
+            self.produce_frame2d(t, q_data, p_data_shifted)
         elif self._plot_type == "3d":
             self.produce_frame3d(t, q_data)
         elif self._plot_type == "3d-re":
@@ -195,9 +200,17 @@ class H1D2Report:
         elif self._plot_type == "3d-3":
             self.produce_frame3d3(t, q_data)
         elif self._plot_type == "3d-3qp":
-            self.produce_frame3d3qp(t, q_data, p_data)
+            self.produce_frame3d3qp(t, q_data, p_data_shifted)
         else:
             raise ValueError(f"Unknown plot type : {self._plot_type}")
+
+    def _shift_p_data(self, p_data: npt.NDArray[numpy.complex128]) -> npt.NDArray[numpy.complex128]:
+        """ shift p_data by (M/2, M/2) using modulo M"""
+        M = self._M
+        ind_x, ind_y = numpy.meshgrid(
+            (numpy.arange(M) + M // 2) % M, (numpy.arange(M) + M // 2) % M
+        )
+        return p_data[ind_x, ind_y]
 
     def produce_frame2d(
         self,
@@ -413,7 +426,8 @@ class H1D2Report:
         )
 
     def record_energy(self, t, q_data, p_data):
-        Hk = numpy.sum(numpy.abs(p_data * numpy.conjugate(p_data)) * self._hk).item()
+        p_data_shifted = self._shift_p_data(p_data)
+        Hk = numpy.sum(numpy.abs(p_data_shifted * numpy.conjugate(p_data_shifted)) * self._hk).item()
         Hp = numpy.sum(numpy.abs(q_data * numpy.conjugate(q_data)) * self._hp).item()
         Htot = Hk + Hp
         logger.info("t=%f, Hk=%f, Hp=%f, Htot=%f", t, Hk, Hp, Htot)
