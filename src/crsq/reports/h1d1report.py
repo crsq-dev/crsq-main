@@ -53,27 +53,18 @@ class H1D1Report:
         self._num_nucl_iters = num_nucl_iters
         self._signed = signed
         # x and qx values
+        M = self._M
         if self._signed:
-            self._xq = np.concatenate(
-                [
-                    np.linspace(0, self._M / 2 - 1, self._M // 2),
-                    np.linspace(-self._M / 2, -1, self._M // 2),
-                ]
-            )
+            self._xq = np.mod(np.linspace(-M // 2, M // 2 - 1, M), M) - M // 2
         else:
-            self._xq = np.linspace(0, self._M - 1, self._M)
+            self._xq = np.arange(M)
         self._x = self._xq * self._dq
         # potential energy function
         self._hpv = np.ndarray(self._M, np.float64)
         # hp_func cannot be applied to a numpy array
         for i in range(self._M):
             self._hpv[i] = self._hp_func(self._x[i])
-        self._kq = np.concatenate(
-            [
-                np.linspace(0, self._M / 2 - 1, self._M // 2),
-                np.linspace(-self._M / 2, -1, self._M // 2),
-            ]
-        )
+        self._kq = np.mod(np.linspace(-M // 2, M // 2 - 1, M), M) - M // 2
         self._dp = 2 * math.pi / self._L
         self._k = self._kq * self._dp
         me = 1.0

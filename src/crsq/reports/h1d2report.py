@@ -1,6 +1,7 @@
-""" Report generator for 1 H atom, 1 dimension
-    This module takes numpy data types.
+"""Report generator for 1 H atom, 1 dimension
+This module takes numpy data types.
 """
+
 from qiskit import QuantumCircuit
 import numpy
 import numpy.typing as npt
@@ -43,6 +44,7 @@ class H1D2Report:
         delta_t: float,
         num_elec_iters: int,
         num_nucl_iters: int,
+        signed=False,
         colormap_name: str = "cmr.guppy",
     ):
         self._outdir = outdir
@@ -68,50 +70,36 @@ class H1D2Report:
         self._T = delta_t * num_elec_iters * num_nucl_iters
         self._num_elec_iters = num_elec_iters
         self._num_nucl_iters = num_nucl_iters
+        self._signed = signed
 
         # x,y and qx,qy values
-        self._xq = numpy.zeros((M, M))
-        self._yq = numpy.zeros((M, M))
-        for i in range(M):
-            self._yq[:, i] = numpy.linspace(0, M - 1, M)
-            self._xq[i, :] = numpy.linspace(0, M - 1, M)
+        if self._signed:
+            iq = numpy.mod(numpy.linspace(-M // 2, M // 2 - 1, M), M) - M // 2
+            self._yq, self._xq = numpy.meshgrid(iq, iq)
+        else:
+            self._yq, self._xq = numpy.meshgrid(numpy.arange(M), numpy.arange(M))
         dq = self._dq
-        self._x = self._xq * dq
         self._y = self._yq * dq
+        self._x = self._xq * dq
         # potential energy
         self._hp = self._hp_func(self._x, self._y)
         # discretized wave number values
 
-        kq = numpy.linspace(-M // 2, M // 2 - 1, M)
+        kq = numpy.mod(numpy.linspace(-M // 2, M // 2 - 1, M), M) - M // 2
         self._kxq, self._kyq = numpy.meshgrid(kq, kq)
 
-        # self._kxq = numpy.zeros((M, M))
-        # self._kyq = numpy.zeros((M, M))
-        # for i in range(M):
-        #     self._kyq[:, i] = kq
-        #     self._kxq[i, :] = kq
-
-        dk = math.pi / self._L
+        dk = 2 * math.pi / self._L
         self._ky = self._kyq * dk
         self._kx = self._kxq * dk
 
         kq2 = numpy.square(kq)
         self._kxq2, self._kyq2 = numpy.meshgrid(kq2, kq2)
-        # self._kxq2 = numpy.zeros((M, M))
-        # self._kyq2 = numpy.zeros((M, M))
-        # for i in range(M):
-        #     self._kyq2[:, i] = kq2
-        #     self._kxq2[i, :] = kq2
         self._kq2 = self._kxq2 + self._kyq2
 
-        dp = 2 * math.pi / self._L
-        self._k2 = self._kq2 * (dp*dp)
+        self._k2 = self._kq2 * (dk * dk)
         self._hk = self._k2 / 2.0
 
         self._prepare_dir()
-
-    def set_plot_type(self, plot_type: str):
-        self._plot_type = plot_type
 
     def set_color_map(self, colormap_name: str):
         self._colormap_name = colormap_name
@@ -148,7 +136,9 @@ class H1D2Report:
         print("Saving to : ", file_name)
         self.write_2d_data(file_name, q_data)
 
-    def write_2d_data(self, file_name: str, data: npt.NDArray[numpy.complex128]) -> None:
+    def write_2d_data(
+        self, file_name: str, data: npt.NDArray[numpy.complex128]
+    ) -> None:
         """save 2d grid data to a text file"""
         if os.path.exists(file_name):
             logger.info("removing old file : %s", file_name)
@@ -204,13 +194,24 @@ class H1D2Report:
         else:
             raise ValueError(f"Unknown plot type : {self._plot_type}")
 
-    def _shift_p_data(self, p_data: npt.NDArray[numpy.complex128]) -> npt.NDArray[numpy.complex128]:
-        """ shift p_data by (M/2, M/2) using modulo M"""
+    def _shift_p_data(
+        self, p_data: npt.NDArray[numpy.complex128]
+    ) -> npt.NDArray[numpy.complex128]:
+        """shift p_data by (M/2, M/2) using modulo M"""
         M = self._M
         ind_x, ind_y = numpy.meshgrid(
             (numpy.arange(M) + M // 2) % M, (numpy.arange(M) + M // 2) % M
         )
         return p_data[ind_x, ind_y]
+
+    def swap_hl(
+        self, data: npt.NDArray[numpy.complex128]
+    ) -> npt.NDArray[numpy.complex128]:
+        """swap the left and right halves for i, and upper and lower halves for j of the data[i,j]"""
+        if self._signed:
+            return self._shift_p_data(data)
+        else:
+            return data
 
     def produce_frame2d(
         self,
@@ -222,16 +223,17 @@ class H1D2Report:
         colormap = plt.get_cmap(self._colormap_name)
         ax: plt.Axes = axs[0]
         # ax.imshow(numpy.abs(self._psi1q))
+        sw_q_data = self.swap_hl(q_data)
         ax.imshow(
-            numpy.real(q_data),
+            numpy.real(sw_q_data),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
         )
         psi_label = self._psifunc_label
         fig.suptitle(f"t={t:6.3f},dt={self._delta_t},n1={self._n1}," + psi_label)
-        ax.set_xlabel("x")
-        ax.set_ylabel("y")
+        ax.set_xlabel("xq")
+        ax.set_ylabel("yq")
         px: plt.Axes = axs[1]
         px.imshow(
             numpy.abs(p_data),
@@ -239,8 +241,8 @@ class H1D2Report:
             vmin=self._vmin,
             vmax=self._vmax,
         )
-        px.set_xlabel("kx")
-        px.set_ylabel("ky")
+        px.set_xlabel("kxq")
+        px.set_ylabel("kyq")
         # ax.legend()
         filename = f"{self._frames_dir}/t_{t:06.3f}.png"
         print("writing to file : ", filename)
@@ -253,17 +255,20 @@ class H1D2Report:
         )
         colormap = plt.get_cmap(self._colormap_name)
         dq = self._dq
+        sw_x = self.swap_hl(self._x)
+        sw_y = self.swap_hl(self._y)
+        sw_q_data = self.swap_hl(q_data)
 
         ax.set_title("|ψ|")
         ax.set_zlim3d(self._zmin, self._zmax)
         ax.set_xlabel("y")
         ax.set_ylabel("x")
-        np_qxv = self._x
-        np_qyv = self._y
+        np_qxv = sw_x
+        np_qyv = sw_y
         ax.plot_surface(
             np_qyv,
             np_qxv,
-            (1 / dq) * numpy.abs(q_data),
+            (1 / dq) * numpy.abs(sw_q_data),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
@@ -276,7 +281,9 @@ class H1D2Report:
         fig.savefig(filename)
         plt.close(fig)
 
-    def produce_frame3d_re(self, t: float, q_data: npt.NDArray[numpy.complex128]) -> None:
+    def produce_frame3d_re(
+        self, t: float, q_data: npt.NDArray[numpy.complex128]
+    ) -> None:
         fig, ax = plt.subplots(
             subplot_kw={"projection": "3d"}, figsize=(6, 5.5), layout="constrained"
         )
@@ -288,12 +295,13 @@ class H1D2Report:
         ax.set_zlim3d(self._zmin, self._zmax)
         ax.set_xlabel("y")
         ax.set_ylabel("x")
-        np_qxv = self._x
-        np_qyv = self._y
+        np_qxv = self.swap_hl(self._x)
+        np_qyv = self.swap_hl(self._y)
+        sw_q_data = self.swap_hl(q_data)
         ax.plot_surface(
             np_qyv,
             np_qxv,
-            (1 / dq) * numpy.real(q_data),
+            (1 / dq) * numpy.real(sw_q_data),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
@@ -314,20 +322,31 @@ class H1D2Report:
         print("writing to file : ", filename)
         fig.savefig(filename)
         plt.close(fig)
-    
-    def produce_frame3d3qp(self, t: float, q_data: npt.NDArray[numpy.complex128], p_data: npt.NDArray[numpy.complex128]) -> None:
+
+    def produce_frame3d3qp(
+        self,
+        t: float,
+        q_data: npt.NDArray[numpy.complex128],
+        p_data: npt.NDArray[numpy.complex128],
+    ) -> None:
         fig, axs = plt.subplots(
-            2, 3, subplot_kw={"projection": "3d"}, figsize=(15, 12), layout="constrained"
+            2,
+            3,
+            subplot_kw={"projection": "3d"},
+            figsize=(15, 12),
+            layout="constrained",
         )
-        self._produce_frame3d3q(t, q_data, axs[0,:])
-        self._produce_frame3d3p(t, p_data, axs[1,:])
+        self._produce_frame3d3q(t, q_data, axs[0, :])
+        self._produce_frame3d3p(t, p_data, axs[1, :])
         fig.suptitle(self._title + f" t={t:6.3f}")
         filename = f"{self._frames_dir}/t_{t:06.3f}.png"
         print("writing to file : ", filename)
         fig.savefig(filename)
         plt.close(fig)
 
-    def _produce_frame3d3q(self, t: float, q_data: npt.NDArray[numpy.complex128], axs) -> None:
+    def _produce_frame3d3q(
+        self, t: float, q_data: npt.NDArray[numpy.complex128], axs
+    ) -> None:
         colormap = plt.get_cmap(self._colormap_name)
         dq = self._dq
 
@@ -337,12 +356,14 @@ class H1D2Report:
         ax.set_xlabel("y")
         ax.set_ylabel("x")
 
-        np_qyv = self._y
-        np_qxv = self._x
+        np_qyv = self.swap_hl(self._y)
+        np_qxv = self.swap_hl(self._x)
+        sw_q_data = self.swap_hl(q_data)
+
         ax.plot_surface(
             np_qyv,
             np_qxv,
-            (1 / dq) * numpy.abs(q_data),
+            (1 / dq) * numpy.abs(sw_q_data),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
@@ -356,7 +377,7 @@ class H1D2Report:
         ax.plot_surface(
             np_qyv,
             np_qxv,
-            (1 / dq) * numpy.real(q_data),
+            (1 / dq) * numpy.real(sw_q_data),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
@@ -370,13 +391,15 @@ class H1D2Report:
         ax.plot_surface(
             np_qyv,
             np_qxv,
-            (1 / dq) * numpy.imag(q_data),
+            (1 / dq) * numpy.imag(sw_q_data),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
         )
 
-    def _produce_frame3d3p(self, t: float, p_data: npt.NDArray[numpy.complex128], axs) -> None:
+    def _produce_frame3d3p(
+        self, t: float, p_data: npt.NDArray[numpy.complex128], axs
+    ) -> None:
         colormap = plt.get_cmap(self._colormap_name)
         dq = self._dq
 
@@ -386,12 +409,13 @@ class H1D2Report:
         ax.set_xlabel("ky")
         ax.set_ylabel("kx")
 
-        np_ky = self._ky
-        np_kx = self._kx
+        np_ky = self._shift_p_data(self._ky)
+        np_kx = self._shift_p_data(self._kx)
+        shifted_p_data = p_data
         ax.plot_surface(
             np_ky,
             np_kx,
-            (1 / dq) * numpy.abs(p_data),
+            (1 / dq) * numpy.abs(shifted_p_data),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
@@ -405,7 +429,7 @@ class H1D2Report:
         ax.plot_surface(
             np_ky,
             np_kx,
-            (1 / dq) * numpy.real(p_data),
+            (1 / dq) * numpy.real(shifted_p_data),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
@@ -419,15 +443,16 @@ class H1D2Report:
         ax.plot_surface(
             np_ky,
             np_kx,
-            (1 / dq) * numpy.imag(p_data),
+            (1 / dq) * numpy.imag(shifted_p_data),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
         )
 
     def record_energy(self, t, q_data, p_data):
-        p_data_shifted = self._shift_p_data(p_data)
-        Hk = numpy.sum(numpy.abs(p_data_shifted * numpy.conjugate(p_data_shifted)) * self._hk).item()
+        Hk = numpy.sum(
+            numpy.abs(p_data * numpy.conjugate(p_data)) * self._hk
+        ).item()
         Hp = numpy.sum(numpy.abs(q_data * numpy.conjugate(q_data)) * self._hp).item()
         Htot = Hk + Hp
         logger.info("t=%f, Hk=%f, Hp=%f, Htot=%f", t, Hk, Hp, Htot)
@@ -438,7 +463,9 @@ class H1D2Report:
     def _plot_energy(self):
         fig, ax = plt.subplots(1, 1, figsize=(10, 8))
         psi_label = self._psifunc_label
-        ax.set_title(f"M={self._M},L={self._L},T={self._T:6.3f},dt={self._delta_t} {psi_label}")
+        ax.set_title(
+            f"M={self._M},L={self._L},T={self._T:6.3f},dt={self._delta_t} {psi_label}"
+        )
         npt = numpy.array(self._trace_time)
         nphk = numpy.array(self._hk_trace)
         nphp = numpy.array(self._hp_trace)
@@ -454,7 +481,6 @@ class H1D2Report:
         print("writing to file : ", filename)
         fig.savefig(fname=filename)
         plt.close(fig)
-
 
     def generate_report(self) -> None:
         """"""
