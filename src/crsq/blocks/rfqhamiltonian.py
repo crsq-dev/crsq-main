@@ -176,13 +176,13 @@ class RfqElectronPotentialBlock(heap.Frame):
         # logger.info("elec_nucl_phase_shift_1d: q = %f Q0 = %f r=%f", q, self._Q0, r)
         return -self._disc_spec.delta_t * self._rfq_spec.elec_nucl_potential_func(r)
 
-    def _elec_nucl_phase_shift_2d(self, qx: float, qy:float):
+    def _elec_nucl_phase_shift_2d(self, x: float, y: float) -> float:
         """ calculate -δt*Ven(q)/hbar
             -delta_t * Ven(q)
         """
-        dqx = qx - self._Q0[0]
-        dqy = qy - self._Q0[1]
-        r = math.sqrt(dqx*dqx + dqy*dqy)
+        dx = x - self._Q0[0]
+        dy = y - self._Q0[1]
+        r = math.sqrt(dx*dx + dy*dy)
         return -self._disc_spec.delta_t * self._rfq_spec.elec_nucl_potential_func(r)
 
     def _elec_nucl_phase_shift_3d(self, qx: float, qy:float, qz:float):
@@ -289,7 +289,7 @@ class RfqElectronPotentialBlock(heap.Frame):
         rfq_spec = self._rfq_spec
         if rfq_spec.should_use_gray_code:
             rfgcq1d = ucr_potential.UCRPotential1d(
-                wfr_spec.num_coordinate_bits, wfr_spec.delta_q, v_phase_shift_func
+                wfr_spec.num_coordinate_bits, wfr_spec.i_to_x, v_phase_shift_func
             )
             self.invoke(rfgcq1d.bind(x=xr.register, target=self._target))
         else:
@@ -297,12 +297,12 @@ class RfqElectronPotentialBlock(heap.Frame):
                 "1D radial function QROM without graycode is not implemented yet."
             )
 
-    def _apply_radial_func_qrom_2d(self, xr: ast.Register, yr: ast.Register, rfunc2d: Callable[[float, float], float]):
+    def _apply_radial_func_qrom_2d(self, xr: ast.Register, yr: ast.Register, rfunc2d: Callable[[int, int], float]):
         wfr_spec = self._wfr_spec
         rfq_spec = self._rfq_spec
         if rfq_spec.should_use_gray_code:
             rfgcq = ucr_potential.UCRPotential2d(
-                wfr_spec.num_coordinate_bits, wfr_spec.delta_q, rfunc2d
+                wfr_spec.num_coordinate_bits, wfr_spec.i_to_x, wfr_spec.j_to_y, rfunc2d
             )
             self.invoke(rfgcq.bind(x=xr.register, y=yr.register, target=self._target))
         else:
@@ -370,9 +370,6 @@ class RfqElectronPotentialBlock(heap.Frame):
     def _build_elec_nucl_potential_terms_2d(self):
         logger.info("_build_elec_nucl_potential_terms_2d")
         wfr_spec = self._wfr_spec
-        ham_spec = self._ham_spec
-        nuclei_data = ham_spec.nuclei_data
-        num_moving_nuclei = wfr_spec.num_moving_nuclei
         # TODO : moving atoms are not implemented yet.
         for ie in range(wfr_spec.num_electrons):
             for ia in range(wfr_spec.num_stationary_nuclei):
@@ -380,8 +377,6 @@ class RfqElectronPotentialBlock(heap.Frame):
                 scope: ast.Scope = ast.new_scope(self)
                 exr = scope.register(self._eregs[ie][0], signed=True)
                 eyr = scope.register(self._eregs[ie][1], signed=True)
-                ndata = nuclei_data[num_moving_nuclei + ia]
-                pos = ndata["pos"]
                 # we don't need subtractions here because the UCR data
                 # takes into concern the position of the nucleus.
                 scope.build_circuit()

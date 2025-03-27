@@ -19,7 +19,10 @@ class WaveFunctionRegisterSpec:
                  num_electrons: int,
                  num_moving_nuclei: int,
                  num_stationary_nuclei: int,
-                 use_spin = False):
+                 use_spin = False,
+                 i_to_x=None,
+                 j_to_y=None,
+                 k_to_z=None):
         """ constructor """
         self._dimension = dimension
         self._num_coordinate_bits = num_coordinate_bits
@@ -33,6 +36,9 @@ class WaveFunctionRegisterSpec:
         M = 2**num_coordinate_bits
         self._delta_q = space_length/M
         self._delta_k = 2*math.pi/space_length
+        self._i_to_x = i_to_x
+        self._j_to_y = j_to_y
+        self._k_to_z = k_to_z
         logger.info("WaveFunctionRegisterSpec: dimension = %d", dimension)
         logger.info("WaveFunctionRegisterSpec: num_coordinate_bits = %d", num_coordinate_bits)
         logger.info("WaveFunctionRegisterSpec: space_length = %f", space_length)
@@ -103,6 +109,21 @@ class WaveFunctionRegisterSpec:
     def has_elec_potential_term(self) -> bool:
         """ has electron-electron or electron-nucleus potential term """
         return (self._num_electrons >= 1 and self.num_nuclei >= 1) or self.num_electrons >= 2
+    
+    @property
+    def i_to_x(self):
+        """ mapping from i to x """
+        return self._i_to_x
+    
+    @property
+    def j_to_y(self):
+        """ mapping from j to y """
+        return self._j_to_y
+    
+    @property
+    def k_to_z(self):
+        """ mapping from k to z """
+        return self._k_to_z
 
     def allocate_elec_registers(self) -> List[List[QuantumRegister]]:
         """ allocate electron index registers"""

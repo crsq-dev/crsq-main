@@ -24,8 +24,8 @@ class UCRPotential1d(Frame):
     Args of __init__:
         num_coord_bits: int
             number of bits for each coordinate
-        dq: float
-            grid spacing
+        i_to_x: list[float]
+            map from array index to x coordinate
         phase_shift_func: callable
             phase shift function of q (not r) to be implemented by the UCR gate.
             This function should calculate -δt*V(q)/hbar.
@@ -44,7 +44,7 @@ class UCRPotential1d(Frame):
     def __init__(
         self,
         num_coord_bits: int,
-        dq: float,
+        i_to_x: list[float],
         phase_shift_func: Callable[[float], float],
         build=True,
     ):
@@ -52,7 +52,7 @@ class UCRPotential1d(Frame):
         logger.info("start: UCRPotential1d")
         t1 = time.time()
         self._num_coord_bits = num_coord_bits
-        self._dq = dq
+        self._i_to_x = i_to_x
         self._phase_shift_func = phase_shift_func
         self._prepare_data()
         self.allocate_registers()
@@ -68,7 +68,7 @@ class UCRPotential1d(Frame):
         M = 1 << n
         self._data = np.ndarray(M, dtype=float)
         for i in range(M):
-            q = i * self._dq
+            q = self._i_to_x[i]
             psi = self._phase_shift_func(q)
             # logger.info("i=%d, q=%f, psi=%f", i, q, psi)
             if abs(psi) > math.pi:
@@ -128,16 +128,18 @@ class UCRPotential2d(Frame):
     def __init__(
         self,
         num_coord_bits: int,
-        dq: float,
-        rfunc2d: Callable[[float, float], float],
+        i_to_x: list[float],
+        j_to_y: list[float],
+        rfunc2: Callable[[float, float], float],
         build=True,
     ):
         super().__init__(label="UCRPotential2d")
         logger.info("start: UCRPotential2d")
         t1 = time.time()
         self._num_coord_bits = num_coord_bits
-        self._dq = dq
-        self._rfunc2d = rfunc2d
+        self._i_to_x = i_to_x
+        self._j_to_y = j_to_y
+        self._rfunc2 = rfunc2
         self._prepare_data()
         self.allocate_registers()
         if build:
@@ -151,14 +153,14 @@ class UCRPotential2d(Frame):
         n = self._num_coord_bits
         M = 1 << n
         self._data = np.ndarray(M * M, dtype=float)
-        for i in range(M):
-            qy = i * self._dq
-            for j in range(M):
-                qx = j * self._dq
-                psi = self._rfunc2d(qx, qy)
+        for j in range(M):
+            y = self._j_to_y[j]
+            for i in range(M):
+                x = self._i_to_x[i]
+                psi = self._rfunc2(x, y)
                 if abs(psi) > math.pi:
-                    logger.warning("x=%f, y=%f, r=%f, psi=%f", x, y, r, psi)
-                self._data[i * M + j] = -2.0 * psi
+                    logger.warning("x=%f, y=%f, psi=%f", x, y, psi)
+                self._data[j * M + i] = -2.0 * psi
 
     def allocate_registers(self):
         n = self._num_coord_bits
@@ -192,16 +194,18 @@ class UCRPotential2dTestBoard(Frame):
     def __init__(
         self,
         n: int,
-        dq: float,
-        rfunc: callable,
+        i2y: list[float],
+        j2x: list[float],
+        rfunc2idx: callable,
         use_symmetry=True,
         use_transpose=True,
         verbose=True,
     ):
         super().__init__(label="RFQTest")
         self._n = n
-        self._dq = dq
-        self._rfunc = rfunc
+        self._i2y = i2y
+        self._j2x = j2x
+        self._rfunc2idx = rfunc2idx
         self._use_symmetry = use_symmetry
         self._use_transpose = use_transpose
         self._verbose = verbose
@@ -218,7 +222,7 @@ class UCRPotential2dTestBoard(Frame):
         qc = self.circuit
         qc.h(self._x)
         qc.h(self._y)
-        self._rfq = UCRPotential2d(self._n, self._dq, self._rfunc)
+        self._rfq = UCRPotential2d(self._n, self._i2y, self._j2x, self._rfunc2idx)
         self.invoke(
             self._rfq.bind(x=self._x, y=self._y, target=self._target),
             invoke_as_instruction=True,
