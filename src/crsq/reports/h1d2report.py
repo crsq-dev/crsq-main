@@ -9,13 +9,16 @@ import ffmpeg
 import os
 import glob
 
-from typing import Tuple, Callable
+from typing import Callable
 
 import math
 
 import matplotlib.pyplot as plt
 from matplotlib import colormaps
 import cmasher as cmr
+
+# avoid cmr from getting removed from imports
+dummy1 = cmr.amber
 
 from crsq.blocks import wave_function, time_evolution
 import crsq.utils.statevector as svec
@@ -463,9 +466,7 @@ class H1D2Report:
     def _plot_energy(self):
         fig, ax = plt.subplots(1, 1, figsize=(10, 8))
         psi_label = self._psifunc_label
-        ax.set_title(
-            f"M={self._M},L={self._L},T={self._T:6.3f},dt={self._delta_t} {psi_label}"
-        )
+        ax.set_title(f"{self._title} {psi_label}")
         npt = numpy.array(self._trace_time)
         nphk = numpy.array(self._hk_trace)
         nphp = numpy.array(self._hp_trace)

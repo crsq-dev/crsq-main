@@ -75,6 +75,9 @@ class PsiH1D_Loudon:
     def name(self):
         return f"H1D_L_{self._N}_{self.parity}_Q0_{self._Q0}"
 
+    @property
+    def eigen_value(self):
+        return -1 / 2 * self._N**2
 
 class PsiH1D_Palma:
     """Hydrogen atom 1s wave function, 1 dimensional version"""

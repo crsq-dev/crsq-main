@@ -26,6 +26,7 @@ class H1D1Report:
         self,
         outdir: str,
         title: str,
+        psifunc_label: str,
         num_coordinate_bits: int,
         psi_axis_scale: float,
         space_length: float,
@@ -39,6 +40,7 @@ class H1D1Report:
         self._outdir = outdir
         self._frames_dir = outdir + "/frames"
         self._title = title
+        self._psifunc_label = psifunc_label
         self._n1 = num_coordinate_bits
         self._M = 1 << self._n1
         self._WM = window_radius
@@ -168,7 +170,8 @@ class H1D1Report:
 
     def _plot_energy(self):
         fig, ax = plt.subplots(1, 1, figsize=(10, 8))
-        ax.set_title(f"M={self._M},L={self._L},T={self._T:6.3f},dt={self._delta_t}")
+        psi_label = self._psifunc_label
+        ax.set_title(f"{self._title} {psi_label}")
         npt = np.array(self._trace_time)
         nphk = np.array(self._hk_trace)
         nphp = np.array(self._hp_trace)

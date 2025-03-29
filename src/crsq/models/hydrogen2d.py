@@ -107,7 +107,7 @@ class VHAtom2:
         self._dq = dq
         self._r0 = r0
         self._Z = Z
-        logger.info("VHAtom2.__init__:   dq = %f, r0=%f", dq, r0)
+        logger.info("VHAtom2.__init__:   dq = %f, r0=%f  r0/dq=%f", dq, r0, r0/dq)
 
 
     def __call__(self, x: numpy.ndarray, y: numpy.ndarray) -> numpy.ndarray:
