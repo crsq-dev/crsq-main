@@ -9,7 +9,7 @@ import ffmpeg
 import os
 import glob
 
-from typing import Callable
+from typing import Callable, Dict
 
 import math
 
@@ -43,12 +43,12 @@ class H1D2Report:
         vmin: float,
         vmax: float,
         space_length: float,
-        hp_func: Callable[[float, float], float],
+        hp_func: Callable[[float, float], float] | Dict[str, Callable[[float,float],float]],
         delta_t: float,
         num_elec_iters: int,
         num_nucl_iters: int,
         signed=False,
-        colormap_name: str = "cmr.guppy",
+        colormap_name: str = "cmr.guppy"
     ):
         self._outdir = outdir
         self._plot_type = plot_type
@@ -85,7 +85,10 @@ class H1D2Report:
         self._y = self._yq * dq
         self._x = self._xq * dq
         # potential energy
-        self._hp = self._hp_func(self._x, self._y)
+        if isinstance(self._hp_func, dict):
+            self._hp = { key: self._hp_func[key](self._x, self._y) for key in self._hp_func.keys() }
+        else:
+            self._hp = { "Hp": self._hp_func(self._x, self._y) }
         # discretized wave number values
 
         kq = numpy.mod(numpy.linspace(-M // 2, M // 2 - 1, M), M) - M // 2
@@ -129,7 +132,9 @@ class H1D2Report:
         """"""
         self._trace_time = []
         self._hk_trace = []
-        self._hp_trace = []
+        self._hp_trace = {}
+        for key in self._hp.keys():
+            self._hp_trace[key] = []
 
     def add_data_sample(
         self, label: str, t: float, q_data: npt.NDArray[numpy.complex128]
@@ -453,28 +458,35 @@ class H1D2Report:
         )
 
     def record_energy(self, t, q_data, p_data):
+        self._trace_time.append(t)
+
         Hk = numpy.sum(
             numpy.abs(p_data * numpy.conjugate(p_data)) * self._hk
         ).item()
-        Hp = numpy.sum(numpy.abs(q_data * numpy.conjugate(q_data)) * self._hp).item()
-        Htot = Hk + Hp
-        logger.info("t=%f, Hk=%f, Hp=%f, Htot=%f", t, Hk, Hp, Htot)
-        self._trace_time.append(t)
         self._hk_trace.append(Hk)
-        self._hp_trace.append(Hp)
 
+        for key in self._hp.keys():
+            hpf = self._hp[key]
+            Hp = numpy.sum(numpy.abs(q_data * numpy.conjugate(q_data)) * hpf).item()
+            Htot = Hk + Hp
+            self._hp_trace[key].append(Hp)
+            logger.info("t=%f, Hk=%f, %s=%f, Hk+%s=%f", t, Hk, key, Hp, key, Htot)
+    
     def _plot_energy(self):
         fig, ax = plt.subplots(1, 1, figsize=(10, 8))
         psi_label = self._psifunc_label
         ax.set_title(f"{self._title} {psi_label}")
         npt = numpy.array(self._trace_time)
         nphk = numpy.array(self._hk_trace)
-        nphp = numpy.array(self._hp_trace)
-        nphtot = nphk + nphp
         ax.grid(True)
         ax.plot(npt, nphk, label="Hk(t)")
-        ax.plot(npt, nphp, label="Hp(t)")
-        ax.plot(npt, nphtot, label="Hk(t)+Hp(t)")
+        for key in self._hp.keys():
+            nphp = numpy.array(self._hp_trace[key])
+            ax.plot(npt, nphp, label=f"{key}(t)")
+        for key in self._hp.keys():
+            nphp = numpy.array(self._hp_trace[key])
+            nphtot = nphk + nphp
+            ax.plot(npt, nphtot, label=f"Hk(t)+{key}(t)")
         ax.set_xlabel("t (time)")
         ax.set_ylabel("energy")
         ax.legend()
