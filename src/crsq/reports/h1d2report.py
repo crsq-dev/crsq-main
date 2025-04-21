@@ -5,6 +5,7 @@ This module takes numpy data types.
 from qiskit import QuantumCircuit
 import numpy
 import numpy.typing as npt
+import pandas as pd
 import ffmpeg
 import os
 import glob
@@ -491,9 +492,21 @@ class H1D2Report:
         ax.set_ylabel("energy")
         ax.legend()
         filename = f"{self._outdir}/energy_trace.png"
-        print("writing to file : ", filename)
+        csv_filename = f"{self._outdir}/energy_trace.csv"
+        print("writing to file : ", filename, csv_filename)
         fig.savefig(fname=filename)
         plt.close(fig)
+
+        energy_df = pd.DataFrame(
+            index=npt,
+            data={
+                "Hk": nphk,
+                "Hp": nphp,
+                "Htot": nphtot,
+            },
+        )
+        energy_df.to_csv(csv_filename, index=True, index_label='t', header=True, float_format="%.6f")
+
 
     def generate_report(self) -> None:
         """"""

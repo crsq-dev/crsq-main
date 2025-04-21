@@ -1,4 +1,5 @@
 from qiskit import QuantumCircuit
+import pandas as pd
 import numpy as np
 import numpy.typing as npt
 import ffmpeg
@@ -187,6 +188,17 @@ class H1D1Report:
         print("writing to file : ", filename)
         fig.savefig(fname=filename)
         plt.close(fig)
+
+        energy_df = pd.DataFrame(
+            index=npt,
+            data={
+                "Hk": nphk,
+                "Hp": nphp,
+                "Htot": nphtot,
+            },
+        )
+        csv_filename = f"{self._outdir}/energy_trace.csv"
+        energy_df.to_csv(csv_filename, index=True, index_label='t', header=True, float_format="%.6f")
 
     def _produce_video_frame(self, t: float, sw_q_data, p_data):
         fig, axs = plt.subplots(3, 1, figsize=(8, 12), layout="constrained")
