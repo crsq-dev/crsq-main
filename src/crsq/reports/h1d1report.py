@@ -202,7 +202,7 @@ class H1D1Report:
 
     def _produce_video_frame(self, t: float, sw_q_data, p_data):
         fig, axs = plt.subplots(3, 1, figsize=(8, 12), layout="constrained")
-        fig.suptitle(self._title + f" t={t:6.3f}")
+        fig.suptitle(self._title + f" t={t:.3f}")
         self._produce_psiq_frame(t, axs[0], sw_q_data)
         self._produce_psip_frame(t, axs[1], p_data)
         self._produce_logpsip_frame(t, axs[2], p_data)
@@ -218,8 +218,9 @@ class H1D1Report:
         rdq = math.sqrt(self._dq)
         np_qv = self.swapv(self._x)
         np_psi5q = sw_q_data
-        psi_label = "ψ(x)"
+        psi_label = "(A) ψ(x)"
         ax.set_title(psi_label)
+        ax.grid(True)
         ax.plot(np_qv, (1 / rdq) * np.abs(np_psi5q), label="|ψ(x)|")
         ax.plot(np_qv, (1 / rdq) * np.real(np_psi5q), label="Re(ψ(x))")
         ax.plot(np_qv, (1 / rdq) * np.imag(np_psi5q), label="Im(ψ(x))")
@@ -247,8 +248,9 @@ class H1D1Report:
         ps4p2 = psi4p[M - WM : M]
         np_psi4p = np.concatenate([ps4p2, ps4p1])
 
-        psi_label = "ψ\u0303(k)"
+        psi_label = "(B) ψ\u0303(k)"
         ax.set_title(psi_label)
+        ax.grid(True)
         ax.plot(np_pv, np.abs(np_psi4p), label="|ψ\u0303(k)|")
         ax.plot(np_pv, np.real(np_psi4p), label="Re(ψ\u0303(k))")
         ax.plot(np_pv, np.imag(np_psi4p), label="Im(ψ\u0303(k))")
@@ -276,7 +278,7 @@ class H1D1Report:
         logp1 = abspsi[0:WM]
         logp2 = abspsi[M - WM : M]
         logp = np.concatenate([logp2, logp1])
-        ax.plot(np_pv, logp, label="|ψ\u0303(k)|")
+        ax.plot(np_pv, logp, label="(C) |ψ\u0303(k)|")
 
         # logt = np.log2(self._tarray)
         # logt1 = logt[0:WM]

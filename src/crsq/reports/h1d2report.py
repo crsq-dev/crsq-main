@@ -43,6 +43,10 @@ class H1D2Report:
         zmax: float,
         vmin: float,
         vmax: float,
+        kzmin: float,
+        kzmax: float,
+        kvmin: float,
+        kvmax: float,
         space_length: float,
         hp_func: Callable[[float, float], float] | Dict[str, Callable[[float,float],float]],
         delta_t: float,
@@ -69,6 +73,10 @@ class H1D2Report:
         self._zmax = zmax
         self._vmin = vmin
         self._vmax = vmax
+        self._kzmin = kzmin
+        self._kzmax = kzmax
+        self._kvmin = kvmin
+        self._kvmax = kvmax
         self._delta_t = delta_t
         self._total_time = delta_t * num_elec_iters * num_nucl_iters
         self._T = delta_t * num_elec_iters * num_nucl_iters
@@ -247,8 +255,8 @@ class H1D2Report:
         px.imshow(
             numpy.abs(p_data),
             cmap=colormap,
-            vmin=self._vmin,
-            vmax=self._vmax,
+            vmin=self._kvmin,
+            vmax=self._kvmax,
         )
         px.set_xlabel("kxq")
         px.set_ylabel("kyq")
@@ -342,12 +350,12 @@ class H1D2Report:
             2,
             3,
             subplot_kw={"projection": "3d"},
-            figsize=(15, 12),
+            figsize=(15, 10),
             layout="constrained",
         )
         self._produce_frame3d3q(t, q_data, axs[0, :])
         self._produce_frame3d3p(t, p_data, axs[1, :])
-        fig.suptitle(self._title + f" t={t:6.3f}")
+        fig.suptitle(self._title + f" t={t:.3f}")
         filename = f"{self._frames_dir}/t_{t:06.3f}.png"
         print("writing to file : ", filename)
         fig.savefig(filename)
@@ -360,7 +368,7 @@ class H1D2Report:
         dq = self._dq
 
         ax: plt.Axes = axs[0]
-        ax.set_title("|ψ|")
+        ax.set_title("(A) |ψ|")
         ax.set_zlim3d(self._zmin, self._zmax)
         ax.set_xlabel("y")
         ax.set_ylabel("x")
@@ -379,7 +387,7 @@ class H1D2Report:
         )
 
         ax = axs[1]
-        ax.set_title("Re(ψ)")
+        ax.set_title("(B) Re(ψ)")
         ax.set_zlim3d(self._zmin, self._zmax)
         ax.set_xlabel("y")
         ax.set_ylabel("x")
@@ -393,7 +401,7 @@ class H1D2Report:
         )
 
         ax = axs[2]
-        ax.set_title("Im(ψ)")
+        ax.set_title("(C) Im(ψ)")
         ax.set_zlim3d(self._zmin, self._zmax)
         ax.set_xlabel("y")
         ax.set_ylabel("x")
@@ -413,8 +421,8 @@ class H1D2Report:
         dq = self._dq
 
         ax: plt.Axes = axs[0]
-        ax.set_title("|ψ\u0303|")
-        ax.set_zlim3d(self._zmin, self._zmax)
+        ax.set_title("(D) |ψ\u0303|")
+        ax.set_zlim3d(self._kzmin, self._kzmax)
         ax.set_xlabel("ky")
         ax.set_ylabel("kx")
 
@@ -426,13 +434,13 @@ class H1D2Report:
             np_kx,
             (1 / dq) * numpy.abs(shifted_p_data),
             cmap=colormap,
-            vmin=self._vmin,
-            vmax=self._vmax,
+            vmin=self._kvmin,
+            vmax=self._kvmax,
         )
 
         ax = axs[1]
-        ax.set_title("Re(ψ\u0303)")
-        ax.set_zlim3d(self._zmin, self._zmax)
+        ax.set_title("(E) Re(ψ\u0303)")
+        ax.set_zlim3d(self._kzmin, self._kzmax)
         ax.set_xlabel("ky")
         ax.set_ylabel("kx")
         ax.plot_surface(
@@ -440,13 +448,13 @@ class H1D2Report:
             np_kx,
             (1 / dq) * numpy.real(shifted_p_data),
             cmap=colormap,
-            vmin=self._vmin,
-            vmax=self._vmax,
+            vmin=self._kvmin,
+            vmax=self._kvmax,
         )
 
         ax = axs[2]
-        ax.set_title("Im(ψ\u0303)")
-        ax.set_zlim3d(self._zmin, self._zmax)
+        ax.set_title("(F) Im(ψ\u0303)")
+        ax.set_zlim3d(self._kzmin, self._kzmax)
         ax.set_xlabel("ky")
         ax.set_ylabel("kx")
         ax.plot_surface(
@@ -454,8 +462,8 @@ class H1D2Report:
             np_kx,
             (1 / dq) * numpy.imag(shifted_p_data),
             cmap=colormap,
-            vmin=self._vmin,
-            vmax=self._vmax,
+            vmin=self._kvmin,
+            vmax=self._kvmax,
         )
 
     def record_energy(self, t, q_data, p_data):
