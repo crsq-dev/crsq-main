@@ -371,6 +371,8 @@ class RfqElectronPotentialBlock(heap.Frame):
         logger.info("_build_elec_nucl_potential_terms_2d")
         wfr_spec = self._wfr_spec
         # TODO : moving atoms are not implemented yet.
+        if wfr_spec.num_moving_nuclei > 0:
+            raise NotImplementedError("Moving nuclei are not implemented yet.")
         for ie in range(wfr_spec.num_electrons):
             for ia in range(wfr_spec.num_stationary_nuclei):
                 t1 = time.time()
