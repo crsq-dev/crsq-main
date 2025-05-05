@@ -121,6 +121,7 @@ class VHAtom2:
         xq0 = int(self._Qx0 / self._dq)
         yq0 = int(self._Qy0 / self._dq)
         riA[xq0, yq0] = self._r0
+        logger.info("VHAtom2.Hp0 = %f", 1 / self._r0)
         qe = -1
         QA = self._Z
         varray = (qe * QA) / riA
