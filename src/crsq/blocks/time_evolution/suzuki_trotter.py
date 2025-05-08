@@ -213,7 +213,7 @@ class ElectronMotionBlock(heap.Frame):
         self, inverse: bool = False, save_p_state_vector: bool = False
     ):
         """apply QFT on all index registers"""
-        logger.info("_build_apply_electron_qft_step, sim_time=%f", self._sim_time)
+        logger.info("_build_apply_electron_qft_step, inverse=%s, sim_time=%f", inverse, self._sim_time)
         if save_p_state_vector:
             # record before qft back to q-space
             self._save_state_vector_with_label("qft")

@@ -169,6 +169,7 @@ class H1D2Report:
         self._hp_func = hp_func
         self._dq = self._L / self._M
         self._dq = space_length / self._M
+        self._dk = 2 * math.pi / self._L
         self._zmin = zmin
         self._zmax = zmax
         self._vmin = vmin
@@ -206,7 +207,7 @@ class H1D2Report:
         kq = numpy.mod(numpy.linspace(-M // 2, M // 2 - 1, M), M) - M // 2
         self._kxq, self._kyq = numpy.meshgrid(kq, kq)
 
-        dk = 2 * math.pi / self._L
+        dk = self._dk
         self._ky = self._kyq * dk
         self._kx = self._kxq * dk
 
@@ -521,7 +522,7 @@ class H1D2Report:
         self, t: float, p_data: npt.NDArray[numpy.complex128], axs
     ) -> None:
         colormap = plt.get_cmap(self._colormap_name)
-        dq = self._dq
+        dk = self._dk
 
         ax: plt.Axes = axs[0]
         ax.set_title("(D) |ψ\u0303|")
@@ -535,7 +536,7 @@ class H1D2Report:
         ax.plot_surface(
             np_ky,
             np_kx,
-            (1 / dq) * numpy.abs(shifted_p_data),
+            (1 / dk) * numpy.abs(shifted_p_data),
             cmap=colormap,
             vmin=self._kvmin,
             vmax=self._kvmax,
@@ -549,7 +550,7 @@ class H1D2Report:
         ax.plot_surface(
             np_ky,
             np_kx,
-            (1 / dq) * numpy.real(shifted_p_data),
+            (1 / dk) * numpy.real(shifted_p_data),
             cmap=colormap,
             vmin=self._kvmin,
             vmax=self._kvmax,
@@ -563,7 +564,7 @@ class H1D2Report:
         ax.plot_surface(
             np_ky,
             np_kx,
-            (1 / dq) * numpy.imag(shifted_p_data),
+            (1 / dk) * numpy.imag(shifted_p_data),
             cmap=colormap,
             vmin=self._kvmin,
             vmax=self._kvmax,
@@ -590,12 +591,16 @@ class H1D2Report:
         nphk = numpy.array(self._hk_trace)
         ax.grid(True)
         ax.plot(npt, nphk, label="Hk(t)")
+        csvdata = {}
+        csvdata["Hk"] = nphk
         for key in self._hp.keys():
             nphp = numpy.array(self._hp_trace[key])
+            csvdata[key] = nphp
             ax.plot(npt, nphp, label=f"{key}(t)")
         for key in self._hp.keys():
             nphp = numpy.array(self._hp_trace[key])
             nphtot = nphk + nphp
+            csvdata["Hk+" + key] = nphtot
             ax.plot(npt, nphtot, label=f"Hk(t)+{key}(t)")
         ax.set_xlabel("t (time)")
         ax.set_ylabel("energy")
@@ -608,11 +613,7 @@ class H1D2Report:
 
         energy_df = pd.DataFrame(
             index=npt,
-            data={
-                "Hk": nphk,
-                "Hp": nphp,
-                "Htot": nphtot,
-            },
+            data=csvdata,
         )
         energy_df.to_csv(
             csv_filename, index=True, index_label="t", header=True, float_format="%.6f"

@@ -1,6 +1,7 @@
 """ State preparation gate for 2D data on a pair of quantum registers
 """
 
+from typing import List, Tuple
 import cupy as np
 import math, cmath
 import time
@@ -11,6 +12,19 @@ from crsq_heap.heap import Frame, Binding
 
 logger = logging.getLogger(__name__)
 LOG_TIME_THRESH=1
+
+def fix_polar(p: Tuple[float, float])-> Tuple[float, float]:
+    """ fix polar form """
+    if p[1] >= math.pi/2:
+        return (-p[0], p[1]-math.pi)
+    elif p[1] <= -math.pi/2:
+        return (-p[0], p[1]+math.pi)
+    else:
+        return p
+
+def to_fixed_polar(data: List[complex])-> List[Tuple[float, float]]:
+    """ to fixed polar form """
+    return [fix_polar(cmath.polar(x)) for x in data]
 
 class StateEmbedGate2D(Frame):
     """ State embedding gate for 2D data in the form data[r,c]
@@ -55,29 +69,43 @@ class StateEmbedGate2D(Frame):
 
     def build_circuit(self):
         """ build """
-        norms = self.build_norm_tree()
-        phases = self.build_phase_tree()
+        cuarray = np.asarray(self._data)
+        norm = math.sqrt(np.sum(np.square(np.abs(cuarray))))
+        logger.info("sqrt(Σ|Ψ^2|) = %.16f", norm)
+
+        pdata = to_fixed_polar(self._data)
+        norms = self.build_norm_tree_from_polar(pdata)
+        phases = self.build_phase_tree_from_polar(pdata)
+
         n = self._num_bits
+
+        self._test = np.zeros(1 << n, dtype=np.float64)
+        self._test[0] = 1.0
+        cols = 1 << self._num_cbits
+        for c in range(cols):
+            logger.info("data[0][%d] = (%.16f,%.16f)", c, self._data[c].real, self._data[c].imag)
 
         # the top bit is treated differently from the rest,
         # so we cannot use the build_structure_for_bit method here.
         bit = n - 1
+        p = 0
+        hp = 1 << bit
 
         qc = self.circuit
 
         s0 = norms[0][0]
         s1 = norms[1][0]
         theta = 2*math.atan2(s1,s0)
+        nm = math.sqrt(s0*s0 + s1*s1)
+        self._test[p+hp] = self._test[p] * s1/nm
+        self._test[p] = self._test[p] * s0/nm
 
         avg0 = phases[0][0]
         avg1 = phases[1][0]
         phi = avg1 - avg0
 
         global_phase = (avg0 + avg1)/2
-        if global_phase != 0.0:
-            qc.x(self._qreg[0])
-            qc.p(global_phase, self._qreg[0])
-            qc.x(self._qreg[0])
+        logger.info("global_phase = %.16f", global_phase)
 
         if theta == math.pi:
             qc.x(self._qreg[bit])
@@ -86,25 +114,29 @@ class StateEmbedGate2D(Frame):
         elif theta != 0.0:
             qc.ry(theta, self._qreg[bit])
         if phi != 0.0:
+            logger.info("rz(%f, q%d)", phi, bit)
             qc.rz(phi, self._qreg[bit])
         if bit >= 1:
             qc.cx(self._qreg[bit], self._work[bit-1], ctrl_state=0)
-            self.build_structure_for_bit(bit-1, norms[0][1], phases[0][1])
+            self.build_structure_for_bit(bit-1, p, norms[0][1], phases[0][1])
             qc.x(self._work[bit-1])
-            self.build_structure_for_bit(bit-1, norms[1][1], phases[1][1])
+            self.build_structure_for_bit(bit-1, p + hp, norms[1][1], phases[1][1])
             qc.cx(self._qreg[bit], self._work[bit-1])
-    
-    def build_norm_tree(self):
-        norm0 = [(abs(x),) for x in self._data]
-        while len(norm0) >= 4:
-            norm1 = []
-            for j in range(len(norm0)//2):
-                s0 = norm0[2*j][0]
-                s1 = norm0[2*j+1][0]
-                s = math.sqrt(s0*s0 + s1*s1)
-                norm1.append((s, (norm0[2*j], norm0[2*j+1])))
-            norm0 = norm1
-        return norm0
+
+        for c in range(cols):
+            logger.info("test[%d] = %.16f", c, self._test[c])
+
+    def build_square_tree(self):
+        square0 = [(abs(x)*abs(x),) for x in self._data]
+        while len(square0) >= 4:
+            square1 = []
+            for j in range(len(square0)//2):
+                s0 = square0[2*j][0]
+                s1 = square0[2*j+1][0]
+                s = s0 + s1
+                square1.append((s, (square0[2*j], square0[2*j+1])))
+            square0 = square1
+        return square0
 
     def build_phase_tree(self):
         avg0 = [(cmath.phase(x),) for x in self._data]
@@ -117,13 +149,43 @@ class StateEmbedGate2D(Frame):
                 avg1.append((avg, (avg0[2*j], avg0[2*j+1])))
             avg0 = avg1
         return avg0
-    
-    def build_structure_for_bit(self, bit: int, norms, phases):
+
+    def build_norm_tree_from_polar(self, pdata):
+        norm0 = [(p[0],) for p in pdata]
+        while len(norm0) >= 4:
+            norm1 = []
+            for j in range(len(norm0)//2):
+                s0 = norm0[2*j][0]
+                s1 = norm0[2*j+1][0]
+                s = math.sqrt(s0*s0 + s1*s1)
+                norm1.append((s, (norm0[2*j], norm0[2*j+1])))
+            norm0 = norm1
+        return norm0
+
+    def build_phase_tree_from_polar(self, pdata):
+        avg0 = [(p[1],) for p in pdata]
+        while len(avg0) >= 4:
+            avg1 = []
+            for j in range(len(avg0)//2):
+                phi0 = avg0[2*j][0]
+                phi1 = avg0[2*j+1][0]
+                avg = (phi0 + phi1)/2
+                avg1.append((avg, (avg0[2*j], avg0[2*j+1])))
+            avg0 = avg1
+        return avg0
+
+    def build_structure_for_bit(self, bit: int, p: int, norms, phases):
         qc = self.circuit
+
+        hp = 1 << bit
 
         s0 = norms[0][0]
         s1 = norms[1][0]
         theta = 2*math.atan2(s1,s0)
+        
+        nm = math.sqrt(s0*s0 + s1*s1)
+        self._test[p+hp] = self._test[p] * s1/nm
+        self._test[p] = self._test[p] * s0/nm
 
         avg0 = phases[0][0]
         avg1 = phases[1][0]
@@ -136,12 +198,13 @@ class StateEmbedGate2D(Frame):
         elif theta != 0.0:
             qc.cry(theta, self._work[bit], self._qreg[bit])
         if phi != 0.0:
+            logger.info("crz(%f, w%d, q%d)", phi, bit, bit)
             qc.crz(phi, self._work[bit], self._qreg[bit])
         if bit >= 1:
             qc.ccx(self._work[bit], self._qreg[bit], self._work[bit-1], ctrl_state="01")
-            self.build_structure_for_bit(bit-1, norms[0][1], phases[0][1])
+            self.build_structure_for_bit(bit-1, p, norms[0][1], phases[0][1])
             qc.cx(self._work[bit], self._work[bit-1])
-            self.build_structure_for_bit(bit-1, norms[1][1], phases[1][1])
+            self.build_structure_for_bit(bit-1, p + hp, norms[1][1], phases[1][1])
             qc.ccx(self._work[bit], self._qreg[bit], self._work[bit-1])
         
     def bind(self, row: QuantumRegister, col: QuantumRegister)-> Binding:
