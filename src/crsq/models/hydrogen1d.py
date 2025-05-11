@@ -9,7 +9,7 @@ import scipy.special as sp
 class VHAtom:
     """V(x) for H atom. potential function object"""
 
-    def __init__(self, Q0: float, dq: float, Z: float):
+    def __init__(self, Q0: float, dq: float, Z: int):
         """
         Args:
             Q0: float : center of the potential
@@ -38,7 +38,7 @@ class VHAtom:
 class VHAtomDiscrete:
     """V(x) for H atom. potential function object"""
 
-    def __init__(self, xQ0: int, dq: float, Z: float):
+    def __init__(self, xQ0: int, dq: float, nb: int, Z: float):
         """
         Args:
             Q0: float : center of the potential
@@ -47,16 +47,21 @@ class VHAtomDiscrete:
         """
         self._xQ0 = xQ0
         self._dq = dq
+        self._nb = nb
         self._Z = Z
 
-    def __call__(self, xq: npyt.NDArray[numpy.int32]) -> npyt.NDArray[numpy.float64]:
+    def __call__(self, x: npyt.NDArray[numpy.float64]) -> npyt.NDArray[numpy.float64]:
         # riA は、各格子点での原子核までの距離単位は格子間隔。
-        rqiA = numpy.abs(numpy.subtract(xq, self._xQ0))
+        xq = (x // self._dq).astype(int)
+        rqiA = numpy.abs(xq - self._xQ0)
         # ゼロ除算を防ぐために、ゼロになるところは 1/r を inv0 で置き換える。
         rqiA[self._xQ0] = self._dq / 2
+        one_nb = 1 << self._nb
+        quotient_nb = one_nb // rqiA
+        quotient = quotient_nb.astype(float) * 2**(-self._nb)
         qe = -1
         QA = self._Z
-        varray = (qe*QA) / rqiA
+        varray = (qe*QA) * quotient
         return varray
 
     @property
