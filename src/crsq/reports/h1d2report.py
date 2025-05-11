@@ -218,22 +218,21 @@ class H1D2Report:
         self._k2 = self._kq2 * (dk * dk)
         self._hk = self._k2 / 2.0
 
-        self._prepare_dir()
-
     def set_color_map(self, colormap_name: str):
         self._colormap_name = colormap_name
 
-    def _prepare_dir(self) -> None:
+    def _prepare_dir(self, clean: bool) -> None:
         """"""
         dirname = self._frames_dir
         if not os.path.exists(dirname):
             logger.info("Creating directory : %s", dirname)
             print("Creating directory : ", dirname)
             os.makedirs(dirname)
-        for f in glob.glob(f"{dirname}/t_*.png"):
-            os.remove(f)
-        if os.path.exists(self.moviefile):
-            os.remove(self.moviefile)
+        if clean:
+            for f in glob.glob(f"{dirname}/t_*.png"):
+                os.remove(f)
+            if os.path.exists(self.moviefile):
+                os.remove(self.moviefile)
 
     def add_circuit_diagram(self, circuit: QuantumCircuit, block_name: str):
         """Add a circuit diagram to the report"""
@@ -241,8 +240,10 @@ class H1D2Report:
         logger.info(f"Saving circuit diagram of {block_name} to {fname}")
         circuit.draw(output="mpl", filename=fname, scale=0.6, fold=100)
 
-    def open_report(self) -> None:
+    def open_report(self, clean = True) -> None:
         """"""
+        self._prepare_dir(clean)
+
         self._trace_time = []
         self._hk_trace = []
         self._hp_trace = {}
@@ -365,7 +366,7 @@ class H1D2Report:
         px.set_xlabel("kxq")
         px.set_ylabel("kyq")
         # ax.legend()
-        filename = f"{self._frames_dir}/t_{t:06.3f}.png"
+        filename = f"{self._frames_dir}/t_{t:06.3f}_2d.png"
         print("writing to file : ", filename)
         fig.savefig(filename)
         plt.close(fig)
@@ -397,7 +398,7 @@ class H1D2Report:
 
         psi_label = self._psifunc_label
         fig.suptitle(f"t={t:6.3f},dt={self._delta_t},n1={self._n1}," + psi_label)
-        filename = f"{self._frames_dir}/t_{t:06.3f}.png"
+        filename = f"{self._frames_dir}/t_{t:06.3f}_3d.png"
         print("writing to file : ", filename)
         fig.savefig(filename)
         plt.close(fig)
@@ -428,7 +429,7 @@ class H1D2Report:
             vmax=self._vmax,
         )
 
-        filename = f"{self._frames_dir}/t_{t:06.3f}.png"
+        filename = f"{self._frames_dir}/t_{t:06.3f}_3d_re.png"
         print("writing to file : ", filename)
         fig.savefig(filename)
         plt.close(fig)
@@ -439,7 +440,7 @@ class H1D2Report:
         )
         self._produce_frame3d3q(t, q_data, axs)
         fig.suptitle(self._title + f" t={t:6.3f}")
-        filename = f"{self._frames_dir}/t_{t:06.3f}.png"
+        filename = f"{self._frames_dir}/t_{t:06.3f}_3d3.png"
         print("writing to file : ", filename)
         fig.savefig(filename)
         plt.close(fig)
