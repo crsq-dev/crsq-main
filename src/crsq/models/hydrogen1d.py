@@ -45,7 +45,7 @@ class VHAtomDiscrete:
             inv0: float : ゼロ除算を防ぐために 1/0 の代わりに用いる値
             Z: float : charge of the nucleus
         """
-        self._xQ0 = xQ0
+        self._xQ0 = int(xQ0)
         self._dq = dq
         self._nb = nb
         self._Z = Z
@@ -55,13 +55,14 @@ class VHAtomDiscrete:
         xq = (x // self._dq).astype(int)
         rqiA = numpy.abs(xq - self._xQ0)
         # ゼロ除算を防ぐために、ゼロになるところは 1/r を inv0 で置き換える。
-        rqiA[self._xQ0] = self._dq / 2
+        rqiA[self._xQ0] = 1
         one_nb = 1 << self._nb
         quotient_nb = one_nb // rqiA
         quotient = quotient_nb.astype(float) * 2**(-self._nb)
+        quotient[self._xQ0] = 2
         qe = -1
         QA = self._Z
-        varray = (qe*QA) * quotient
+        varray = (qe*QA/self._dq) * quotient
         return varray
 
     @property
