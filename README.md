@@ -20,13 +20,13 @@ Here we describe how to set up a running environment and view the jupyter notebo
 
 python3 that comes with Ubuntu is required.
 ```bash
-$ apt update
-$ apt install python3
+$ sudo apt update
+$ sudo apt install python3
 ```
 
 If you are using WSL2, the "wslu" package is recommended.  This will allow jupyter notebook to launch a browser on the Windows side from within WSL2.
 ```bash
-$ apt install wslu
+$ sudo apt install wslu
 ```
 
 1. Make a directory to work in.  Here we will name it "crsq".
