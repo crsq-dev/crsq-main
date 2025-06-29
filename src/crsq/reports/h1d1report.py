@@ -26,6 +26,7 @@ class H1D1Report:
     def __init__(
         self,
         outdir: str,
+        plot_type: str,
         title: str,
         psifunc_label: str,
         num_coordinate_bits: int,
@@ -39,6 +40,7 @@ class H1D1Report:
         signed: bool,
     ):
         self._outdir = outdir
+        self._plot_type = plot_type
         self._frames_dir = outdir + "/frames"
         self._title = title
         self._psifunc_label = psifunc_label
@@ -73,16 +75,17 @@ class H1D1Report:
         me = 1.0
         # kinetic energy function
         self._hkv = np.square(self._k) / (2.0 * me)
-        self._prepare_dir()
+        self._prepare_dir(True)
 
-    def _prepare_dir(self) -> None:
+    def _prepare_dir(self, clean) -> None:
         dirname = self._frames_dir
         if not os.path.exists(dirname):
             os.makedirs(dirname)
-        for f in glob.glob(f"{dirname}/t_*.png"):
-            os.remove(f)
-        if os.path.exists(self.moviefile):
-            os.remove(self.moviefile)
+        if clean:
+            for f in glob.glob(f"{dirname}/t_*.png"):
+                os.remove(f)
+            if os.path.exists(self.moviefile):
+                os.remove(self.moviefile)
 
     def add_circuit_diagram(self, circuit: QuantumCircuit, block_name: str):
         """Add a circuit diagram to the report"""
@@ -159,6 +162,20 @@ class H1D1Report:
         self._axs[2].plot(sw_qv, im, label=f"t={time:4.3f}")
         """ add a frame for the video """
         self._produce_video_frame(time, sw_q_data, p_data)
+
+    def draw_single_frame(self, t: float, q_data, p_data):
+        """Draw a single frame"""
+        sw_q_data = self.swapv(q_data)
+
+        fig, axs = plt.subplots(2, 1, figsize=(8, 8), layout="constrained")
+        fig.suptitle(self._title + f" t={t:.3f}")
+        self._produce_psiq_frame(t, axs[0], sw_q_data)
+        self._produce_psip_frame(t, axs[1], p_data)
+        filename = f"{self._frames_dir}/t_{t:06.3f}_re_im.png"
+        print("writing to file : ", filename)
+        fig.savefig(filename)
+        plt.close(fig)
+
 
     def record_energy(self, t, q_data, p_data):
         Hk = np.sum(np.abs(p_data * np.conjugate(p_data)) * self._hkv).item()

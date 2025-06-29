@@ -217,6 +217,7 @@ class H1D2Report:
 
         self._k2 = self._kq2 * (dk * dk)
         self._hk = self._k2 / 2.0
+        self._prepare_dir(clean=False)
 
     def set_color_map(self, colormap_name: str):
         self._colormap_name = colormap_name
@@ -245,13 +246,14 @@ class H1D2Report:
         self._prepare_dir(clean)
 
         self._trace_time = []
+        self._theta_trace = []
         self._hk_trace = []
         self._hp_trace = {}
         for key in self._hp.keys():
             self._hp_trace[key] = []
 
     def add_data_sample(
-        self, label: str, t: float, q_data: npt.NDArray[numpy.complex128]
+        self, label: str, t: float, q_data: npt.NDArray[numpy.complex128], q0_data: None | npt.NDArray[numpy.complex128] = None
     ) -> None:
         """save 2d grid data to a text file"""
         file_name = self._frames_dir + f"/{t:06.3f}.{label}.csv"
@@ -571,7 +573,7 @@ class H1D2Report:
             vmax=self._kvmax,
         )
 
-    def record_energy(self, t, q_data, p_data):
+    def record_energy(self, t, q_data, p_data, q0_data=None):
         self._trace_time.append(t)
 
         Hk = numpy.sum(numpy.abs(p_data * numpy.conjugate(p_data)) * self._hk).item()
@@ -583,10 +585,15 @@ class H1D2Report:
             Htot = Hk + Hp
             self._hp_trace[key].append(Hp)
             logger.info("t=%f, Hk=%f, %s=%f, Hk+%s=%f", t, Hk, key, Hp, key, Htot)
+        
+        if q0_data is not None:
+            prod = numpy.vdot(q0_data, q_data).item()
+            self._theta_trace.append(prod)
 
     def _plot_energy(self):
-        fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+        fig, axs = plt.subplots(2, 1, figsize=(6, 12))
         psi_label = self._psifunc_label
+        ax = axs[0]
         ax.set_title(f"{self._title} {psi_label}")
         npt = numpy.array(self._trace_time)
         nphk = numpy.array(self._hk_trace)
@@ -606,6 +613,16 @@ class H1D2Report:
         ax.set_xlabel("t (time)")
         ax.set_ylabel("energy")
         ax.legend()
+
+        ax = axs[1]
+        nptheta = numpy.array(self._theta_trace)
+        csvdata["theta"] = nptheta
+        ax.plot(npt, nptheta)
+        ax.grid(True)
+        ax.set_title("Autocorrelation")
+        ax.set_xlabel("t (time)")
+        ax.set_ylabel("⟨ψ(0)|ψ(t)⟩")
+
         filename = f"{self._outdir}/energy_trace.png"
         csv_filename = f"{self._outdir}/energy_trace.csv"
         print("writing to file : ", filename, csv_filename)

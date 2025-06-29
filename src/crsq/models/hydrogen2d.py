@@ -9,6 +9,64 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def SA_0_0(dq,q0):
+    """Hep0 function for 2D delta-q analysis."""
+    return -q0**2*(-math.exp(-2*q0*dq)+1)
+
+def SB_0_0(dq, q0, N):
+    h=dq/N
+    S=0
+    dq2=dq*dq
+    A=q0**3/math.pi*h**2
+    for i in range(-N, N):
+        x=h*i
+        for j in range(-N, N):
+            y=h*j
+            if x*x+y*y > dq2:
+                r= math.sqrt(x*x+y*y)
+                S += -(A/r)*math.exp(-2*q0*r)
+    return S
+
+def Hep0_0_0(dq, q0, N):
+    SA=SA_0_0(dq,q0)
+    SB=SB_0_0(dq,q0,N)
+    rt2= math.sqrt(2)
+    Hep0=math.pi/(q0**3*dq**2)*(SA+SB)+1/(rt2*dq)*math.exp(-2*rt2*q0*dq) + 2/dq*math.exp(-2*q0*dq)
+    return Hep0
+
+def SA_1_0(dq, q0):
+    """Hep0 function for 2D delta-q analysis."""
+    return -(q0**2) * (-(1 - 4 * q0**2 * dq**2) * math.exp(-2 * q0 * dq) + 1)
+
+
+def SB_1_0(dq, q0, N):
+    h = dq / N
+    S = 0
+    dq2 = dq * dq
+    A = q0**3 / math.pi * h**2
+    for i in range(-N, N):
+        x = h * i
+        for j in range(-N, N):
+            y = h * j
+            if x * x + y * y > dq2:
+                r = math.sqrt(x * x + y * y)
+                S += -(A / r) * (1 - 2 * q0 * r) ** 2 * math.exp(-2 * q0 * r)
+    return S
+
+
+def Hep0_1_0(dq, q0, N):
+    SA = SA_1_0(dq, q0)
+    SB = SB_1_0(dq, q0, N)
+    rt2 = math.sqrt(2)
+    Hep0 = (
+        math.pi / (q0**3 * dq**2) * (SA + SB)
+        + 1 / (rt2 * dq) * (1 - (4 / 3) * rt2 * dq) ** 2 * math.exp(-2 * rt2 * q0 * dq)
+        + 2 / dq * (1 - (4 / 3) * dq) ** 2 * math.exp(-2 * q0 * dq)
+    )
+    return Hep0
+
+
+
 class PsiH2D:
     """ Hydrogen atom, 2 dimensional model
 
@@ -97,7 +155,36 @@ class PsiH2D:
                 return dq*dq*q0/4/(-math.exp(-q0*dq)+1)
             else:
                 return dq*dq*q0/4/((-1+q0*q0*dq*dq)*math.exp(-q0*dq)+1)
-
+    
+    @property
+    def r0_new(self):
+        n = self._n
+        m = self._m
+        q0 = 1/(n+1/2)
+        dq = self._dq
+        if self._m != 0:
+            return dq / 4
+        if n == 0:
+            Hep0 = Hep0_0_0(dq, q0, 40)
+            r0 = -1/Hep0
+            return r0
+        elif n == 1:
+            Hep0 = Hep0_1_0(dq, q0, 40)
+            r0 = -1/Hep0
+            return r0
+        else:
+            raise ValueError(f"Invalid quantum number n={n}. r0_new is not defined for n > 1")
+    
+    def r0_for_pole(self, pole_mitigation: str):
+        """Calculate the r0 value for the pole mitigation method."""
+        if pole_mitigation == "r0lim":
+            return self._dq / 4
+        elif pole_mitigation == "r0":
+            return self.r0
+        elif pole_mitigation == "r0new":
+            return self.r0_new
+        else:
+            raise ValueError(f"Unknown pole mitigation method: {pole_mitigation}")
 
 class PsiH2DRadial:
     """ Hydrogen atom, 2 dimensional model, radial function
@@ -188,17 +275,21 @@ class PsiH2DRadial:
 class VHAtom2:
     """V(x) for H atom. potential function object - 2D version"""
 
-    def __init__(self, Qx0: float, Qy0: float, dq: float, r0: float, Z: float):
+    def __init__(self, Qx0: float, Qy0: float, dq: float, r0: float, Z: float, eps=0):
         self._Qx0 = Qx0
         self._Qy0 = Qy0
         self._dq = dq
         self._r0 = r0
         self._Z = Z
-        logger.info("VHAtom2.__init__:   dq = %f, r0=%f  r0/dq=%f", dq, r0, r0/dq)
+        self._eps = eps
+        logger.info("VHAtom2.__init__:   dq = %f, r0=%f  r0/dq=%f, eps=%f", dq, r0, r0/dq, eps)
 
 
     def __call__(self, x: numpy.ndarray, y: numpy.ndarray) -> numpy.ndarray:
         logger.info("VHAtom2.__call__")
+        if self._eps > 0:
+            return self._calc_with_eps(x,y)
+        
         riA = numpy.sqrt(
             (
                 numpy.square(x - self._Qx0)
@@ -213,6 +304,21 @@ class VHAtom2:
         QA = self._Z
         varray = (qe * QA) / riA
         return varray
+
+    def _calc_with_eps(self, x: numpy.ndarray, y: numpy.ndarray) -> numpy.ndarray:
+        logger.info("VHAtom2._calc_with_eps")
+        riA = numpy.sqrt(
+            (
+                numpy.square(x - self._Qx0)
+                + numpy.square(y - self._Qy0)
+                + numpy.square(self._eps)
+            )
+        )
+        qe = -1
+        QA = self._Z
+        varray = (qe * QA) / riA
+        return varray
+
 
     @property
     def label(self):
