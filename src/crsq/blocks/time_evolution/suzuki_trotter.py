@@ -447,7 +447,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
             with qc.for_loop(range(n_elec_it)):
                 sim_time += delta_t
                 if self._evo_spec.should_calculate_electron_motion:
-                    self._build_electron_motion_step(sim_time, False)
+                    self._build_electron_motion_step(sim_time, is_final_elec_iter=False)
             if self._evo_spec.should_calculate_nucleus_motion:
                 self._build_nuclei_motion_block(sim_time)
 
@@ -461,7 +461,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
             for _elec_it in range(n_elec_it):
                 sim_time += delta_t
                 if evo_spec.should_calculate_electron_motion:
-                    self._build_electron_motion_step(sim_time, False)
+                    self._build_electron_motion_step(sim_time, is_final_elec_iter=False)
             if evo_spec.should_calculate_nucleus_motion:
                 self._build_nuclei_motion_block(sim_time)
 
@@ -475,6 +475,9 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         # we need to go through the circuit one loop to get all registers allocated.
         # self._save_state_vector(time)
 
+        if evo_spec.should_save_q_state_vector:
+            self._save_initial_q_vector()
+
         if evo_spec.should_use_for_loop_gate:
             logger.info("Using for loop gate")
             self._build_time_evolution_circuit_with_save_for_loop_gate(
@@ -485,6 +488,17 @@ class SuzukiTrotterMethodBlock(heap.Frame):
             self._build_time_evolution_circuit_with_save_flat_loop(
                 n_atom_it, n_elec_it, sim_time, delta_t
             )
+
+    def _save_initial_q_vector(self):
+        """save the initial state vector."""
+        # first we need to dry-run the time evolution circuit
+        # to make all the temporary qubits allocated.
+        logger.info("Saving initial state vector")
+        self._build_electron_motion_step(0, is_final_elec_iter=False, dry_run=True)
+        self._save_state_vector(0.0, label="sv")
+        self._build_apply_electron_qft_step(inverse=True)
+        self._save_state_vector(0.0, label="qft")
+        self._build_apply_electron_qft_step()
 
     def _build_time_evolution_circuit_with_save_for_loop_gate(
         self, n_atom_it, n_elec_it, sim_time, delta_t
@@ -520,8 +534,8 @@ class SuzukiTrotterMethodBlock(heap.Frame):
                 self._build_nuclei_motion_block(sim_time)
             self._save_state_vector(sim_time)
 
-    def _save_state_vector(self, sim_time):
-        label = self._evo_spec.make_state_vector_label(sim_time)
+    def _save_state_vector(self, sim_time, label="sv"):
+        label = self._evo_spec.make_state_vector_label(sim_time, label)
         logger.info("save_statevector: %s", label)
         self.circuit.save_statevector(label=label)
 
@@ -564,7 +578,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
                 )
             )
 
-    def _build_electron_motion_step(self, sim_time, is_final_elec_iter):
+    def _build_electron_motion_step(self, sim_time, is_final_elec_iter, dry_run=False):
         wfr_spec = self._wfr_spec
         if wfr_spec.num_electrons == 0:
             return
@@ -588,7 +602,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
                     bound = elec_motion_block.bind(
                         eregs=self._e_index_regs, nregs=self._n_index_regs
                     )
-                self.invoke(bound, invoke_as_instruction=True)
+                self.invoke(bound, invoke_as_instruction=True, dry_run=dry_run)
             return
         logger.info("ElectronMotionBlock: using individual steps")
         evo_spec = self._evo_spec
@@ -596,13 +610,13 @@ class SuzukiTrotterMethodBlock(heap.Frame):
             evo_spec.should_calculate_potential_term
             and wfr_spec.has_elec_potential_term
         ):
-            self._build_elec_potential_step()
+            self._build_elec_potential_step(dry_run=dry_run)
         if evo_spec.should_apply_qft:
-            self._build_apply_electron_qft_step(inverse=True)
+            self._build_apply_electron_qft_step(inverse=True,dry_run=dry_run)
         if evo_spec.should_calculate_kinetic_term:
-            self._build_elec_kinetic_step()
+            self._build_elec_kinetic_step(dry_run=dry_run)
         if evo_spec.should_apply_qft:
-            self._build_apply_electron_qft_step()
+            self._build_apply_electron_qft_step(dry_run=dry_run)
 
     def build_electron_motion_block(self, sim_time: float, is_final_elec_iter=False):
         # cache the block.
@@ -620,21 +634,21 @@ class SuzukiTrotterMethodBlock(heap.Frame):
             )
         return self._elec_motion_block
 
-    def _build_elec_potential_step(self):
+    def _build_elec_potential_step(self, dry_run=False):
         method = self._evo_spec.method
         if method == spec.SUZUKI_TROTTER_ARITHMETIC:
-            self._build_elec_potential_step_arithmetic()
+            self._build_elec_potential_step_arithmetic(dry_run=dry_run)
         elif method == spec.SUZUKI_TROTTER_QROM:
-            self._build_elec_potential_step_qrom()
+            self._build_elec_potential_step_qrom(dry_run=dry_run)
 
-    def _build_elec_potential_step_arithmetic(self):
+    def _build_elec_potential_step_arithmetic(self,dry_run=False):
         block = self.build_elec_potential_block_arithmetic()
         logger.info(
             "ElectronPotentialBlock[ARITHMETIC].num_qubits = %d",
             block.circuit.num_qubits,
         )
         with check_time("ElectronPotentialBlock.invoke"):
-            self.invoke(block.bind(eregs=self._e_index_regs, nregs=self._n_index_regs))
+            self.invoke(block.bind(eregs=self._e_index_regs, nregs=self._n_index_regs), dry_run=dry_run)
 
     def build_elec_potential_block_arithmetic(self, allocate=True, build=True):
         """build a ElectronPotentialBlock instance."""
@@ -673,7 +687,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         )
         return block
 
-    def _build_apply_electron_qft_step(self, inverse: bool = False):
+    def _build_apply_electron_qft_step(self, inverse: bool = False, dry_run=False):
         """apply QFT on all index registers"""
         block = qft.QFTOnWaveFunctionsBlock(
             self._wfr_spec, on_electrons=True, inverse=inverse
@@ -681,7 +695,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         # The QFT block contains non-gate instructions.
         with check_time("QFTOnWaveFunctionsBlock(e).invoke"):
             self.invoke(
-                block.bind(eregs=self._e_index_regs), invoke_as_instruction=True
+                block.bind(eregs=self._e_index_regs), invoke_as_instruction=True, dry_run=dry_run
             )
 
     def _build_nuclei_motion_block(self, sim_time: float):
@@ -726,9 +740,9 @@ class SuzukiTrotterMethodBlock(heap.Frame):
             )
 
     def _build_elec_kinetic_step(self):
-        block = hamiltonian.ElectronKineticBlock(self._wfr_spec, self._disc_spec)
+        block = hamiltonian.ElectronKineticBlock(self._wfr_spec, self._disc_spec, dry_run=False)
         with check_time("ElectronKineticBlock.invoke"):
-            self.invoke(block.bind(eregs=self._e_index_regs))
+            self.invoke(block.bind(eregs=self._e_index_regs), dry_run=False)
 
     def _build_nuclei_kinetic_step(self):
         assert self._wfr_spec.num_moving_nuclei > 0
