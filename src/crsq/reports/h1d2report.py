@@ -217,7 +217,6 @@ class H1D2Report:
 
         self._k2 = self._kq2 * (dk * dk)
         self._hk = self._k2 / 2.0
-        self._prepare_dir(clean=False)
 
     def set_color_map(self, colormap_name: str):
         self._colormap_name = colormap_name
@@ -230,10 +229,9 @@ class H1D2Report:
             print("Creating directory : ", dirname)
             os.makedirs(dirname)
         if clean:
+            logger.info("Cleaning directory : %s", dirname)
             for f in glob.glob(f"{dirname}/t_*.png"):
                 os.remove(f)
-            if os.path.exists(self.moviefile):
-                os.remove(self.moviefile)
 
     def add_circuit_diagram(self, circuit: QuantumCircuit, block_name: str):
         """Add a circuit diagram to the report"""
@@ -304,6 +302,7 @@ class H1D2Report:
         p_data: npt.NDArray[numpy.complex128],
     ) -> None:
         """ """
+        logger.info("Producing frame for t=%f", t)
         p_data_shifted = self._shift_p_data(p_data)
         if self._plot_type == "2d":
             self.produce_frame2d(t, q_data, p_data_shifted)
@@ -311,6 +310,8 @@ class H1D2Report:
             self.produce_frame3d(t, q_data)
         elif self._plot_type == "3d-re":
             self.produce_frame3d_re(t, q_data)
+        elif self._plot_type == "3d-qp":
+            self.produce_frame3d_qp(t, q_data, p_data_shifted)
         elif self._plot_type == "3d-3":
             self.produce_frame3d3(t, q_data)
         elif self._plot_type == "3d-3qp":
@@ -431,7 +432,56 @@ class H1D2Report:
             vmax=self._vmax,
         )
 
-        filename = f"{self._frames_dir}/t_{t:06.3f}_3d_re.png"
+        filename = f"{self._frames_dir}/t_{t:06.3f}_3d-re.png"
+        print("writing to file : ", filename)
+        fig.savefig(filename)
+        plt.close(fig)
+
+    def produce_frame3d_qp(
+        self, t: float, q_data: npt.NDArray[numpy.complex128], shifted_p_data: npt.NDArray[numpy.complex128]
+    ) -> None:
+        fig, axs = plt.subplots(
+            2, 1, subplot_kw={"projection": "3d"}, figsize=(6, 11), layout="constrained"
+        )
+        colormap = plt.get_cmap(self._colormap_name)
+        dq = self._dq
+
+        ax: plt.Axes = axs[0]
+        psi_label = self._psifunc_label
+        ax.set_title(f"Re(ψ) [t={t:6.3f},{psi_label}]")
+        ax.set_zlim3d(self._zmin, self._zmax)
+        ax.set_xlabel("y")
+        ax.set_ylabel("x")
+        np_qxv = self.swap_hl(self._x)
+        np_qyv = self.swap_hl(self._y)
+        sw_q_data = self.swap_hl(q_data)
+        ax.plot_surface(
+            np_qyv,
+            np_qxv,
+            (1 / dq) * numpy.real(sw_q_data),
+            cmap=colormap,
+            vmin=self._vmin,
+            vmax=self._vmax,
+        )
+
+        ax: plt.Axes = axs[1]
+        ax.set_title("Re(ψ\u0303)")
+        dk = self._dk
+        np_ky = self._shift_p_data(self._ky)
+        np_kx = self._shift_p_data(self._kx)
+        ax.set_zlim3d(self._kzmin, self._kzmax)
+        ax.set_xlabel("ky")
+        ax.set_ylabel("kx")
+        ax.plot_surface(
+            np_ky,
+            np_kx,
+            (1 / dk) * numpy.real(shifted_p_data),
+            cmap=colormap,
+            vmin=self._kvmin,
+            vmax=self._kvmax,
+        )
+
+        filename = f"{self._frames_dir}/t_{t:06.3f}_3d-qp.png"
         print("writing to file : ", filename)
         fig.savefig(filename)
         plt.close(fig)
@@ -574,6 +624,7 @@ class H1D2Report:
         )
 
     def record_energy(self, t, q_data, p_data, q0_data=None):
+        logger.info("Recording energy at t=%f", t)
         self._trace_time.append(t)
 
         Hk = numpy.sum(numpy.abs(p_data * numpy.conjugate(p_data)) * self._hk).item()
@@ -591,7 +642,8 @@ class H1D2Report:
             self._theta_trace.append(prod)
 
     def _plot_energy(self):
-        fig, axs = plt.subplots(2, 1, figsize=(6, 12))
+        logger.info("Plotting energy trace")
+        fig, axs = plt.subplots(3, 1, figsize=(6, 12), layout="constrained")
         psi_label = self._psifunc_label
         ax = axs[0]
         ax.set_title(f"{self._title} {psi_label}")
@@ -617,11 +669,20 @@ class H1D2Report:
         ax = axs[1]
         nptheta = numpy.array(self._theta_trace)
         csvdata["theta"] = nptheta
-        ax.plot(npt, nptheta)
+        fidelity = numpy.abs(nptheta) ** 2
+        ax.plot(npt, fidelity)
         ax.grid(True)
-        ax.set_title("Autocorrelation")
+        ax.set_title("fidelity trace")
         ax.set_xlabel("t (time)")
-        ax.set_ylabel("⟨ψ(0)|ψ(t)⟩")
+        ax.set_ylabel("|⟨ψ(0)|ψ(t)⟩|**2")
+
+        ax = axs[2]
+        pplus = 1/2*(1+numpy.real(nptheta))
+        ax.plot(npt, pplus, label="P+")
+        ax.grid(True)
+        ax.set_title("P+ trace")
+        ax.set_xlabel("t (time)")
+        ax.set_ylabel("P+")
 
         filename = f"{self._outdir}/energy_trace.png"
         csv_filename = f"{self._outdir}/energy_trace.csv"
@@ -643,10 +704,14 @@ class H1D2Report:
         self._produce_video()
 
     def _produce_video(self) -> None:
+        logger.info("Producing video")
         moviefile = self.moviefile
+        if os.path.exists(moviefile):
+            logger.info("Removing old video file : %s", moviefile)
+            os.remove(moviefile)
         print("producing video : ", moviefile)
         stream = ffmpeg.input(
-            f"{self._frames_dir}/t_*.png", pattern_type="glob", framerate=8
+            f"{self._frames_dir}/t_??.???.png", pattern_type="glob", framerate=8
         )
         ffmpeg.output(stream, moviefile, pix_fmt="yuv420p").run()
 
