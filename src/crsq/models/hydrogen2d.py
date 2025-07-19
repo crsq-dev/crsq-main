@@ -146,6 +146,8 @@ class PsiH2D:
     
     @property
     def r0(self):
+        """ dq/4に至る式の一時近似をしない式。
+        """
         if self._m > 0:
             return self._dq / 2
         else:
@@ -158,6 +160,8 @@ class PsiH2D:
     
     @property
     def r0_new(self):
+        """ dq/4 に至る式の一時近似をしないで、さらに四角形の四隅の面積も数値計算した式
+        """
         n = self._n
         m = self._m
         q0 = 1/(n+1/2)
@@ -175,10 +179,10 @@ class PsiH2D:
         else:
             raise ValueError(f"Invalid quantum number n={n}. r0_new is not defined for n > 1")
     
-    def r0_for_pole(self, pole_mitigation: str):
+    def r0_for_pole(self, pole_mitigation: str, eps: float = 0.25):
         """Calculate the r0 value for the pole mitigation method."""
         if pole_mitigation == "r0lim":
-            return self._dq / 4
+            return self._dq * eps
         elif pole_mitigation == "r0":
             return self.r0
         elif pole_mitigation == "r0new":
@@ -276,6 +280,14 @@ class VHAtom2:
     """V(x) for H atom. potential function object - 2D version"""
 
     def __init__(self, Qx0: float, Qy0: float, dq: float, r0: float, Z: float, eps=0):
+        """
+            arguments:
+                Qx0, Qy0: float : center of the potential
+                dq: float : offset added to avoid division by zero
+                r0: float : distance from the center of the potential to the pole
+                Z: float : charge of the nucleus
+                eps: float : offset added to avoid division by zero (for rofs pole mitigation)
+        """
         self._Qx0 = Qx0
         self._Qy0 = Qy0
         self._dq = dq
@@ -311,7 +323,7 @@ class VHAtom2:
             (
                 numpy.square(x - self._Qx0)
                 + numpy.square(y - self._Qy0)
-                + numpy.square(self._eps)
+                + numpy.square(self._dq * self._eps)
             )
         )
         qe = -1

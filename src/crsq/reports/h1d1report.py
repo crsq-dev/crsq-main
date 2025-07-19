@@ -26,7 +26,6 @@ class H1D1Report:
     def __init__(
         self,
         outdir: str,
-        plot_type: str,
         title: str,
         psifunc_label: str,
         num_coordinate_bits: int,
@@ -40,7 +39,6 @@ class H1D1Report:
         signed: bool,
     ):
         self._outdir = outdir
-        self._plot_type = plot_type
         self._frames_dir = outdir + "/frames"
         self._title = title
         self._psifunc_label = psifunc_label

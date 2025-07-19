@@ -218,6 +218,9 @@ class H1D2Report:
         self._k2 = self._kq2 * (dk * dk)
         self._hk = self._k2 / 2.0
 
+        # make the frames directory
+        self._prepare_dir(clean=False)
+
     def set_color_map(self, colormap_name: str):
         self._colormap_name = colormap_name
 
@@ -668,7 +671,8 @@ class H1D2Report:
 
         ax = axs[1]
         nptheta = numpy.array(self._theta_trace)
-        csvdata["theta"] = nptheta
+        csvdata["theta.re"] = numpy.real(nptheta)
+        csvdata["theta.im"] = numpy.imag(nptheta)
         fidelity = numpy.abs(nptheta) ** 2
         ax.plot(npt, fidelity)
         ax.grid(True)
