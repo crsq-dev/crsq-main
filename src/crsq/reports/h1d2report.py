@@ -307,6 +307,8 @@ class H1D2Report:
         """ """
         logger.info("Producing frame for t=%f", t)
         p_data_shifted = self._shift_p_data(p_data)
+        if self._plot_type == "none":
+            return
         if self._plot_type == "2d":
             self.produce_frame2d(t, q_data, p_data_shifted)
         elif self._plot_type == "3d":
@@ -708,6 +710,9 @@ class H1D2Report:
         self._produce_video()
 
     def _produce_video(self) -> None:
+        if self._plot_type == "none":
+            logger.info("No video produced for plot type 'none'")
+            return
         logger.info("Producing video")
         moviefile = self.moviefile
         if os.path.exists(moviefile):
