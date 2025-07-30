@@ -40,6 +40,7 @@ class H1D1Report:
     ):
         self._outdir = outdir
         self._frames_dir = outdir + "/frames"
+        self._images_dir = outdir + "/images"
         self._title = title
         self._psifunc_label = psifunc_label
         self._n1 = num_coordinate_bits
@@ -76,11 +77,14 @@ class H1D1Report:
         self._prepare_dir(True)
 
     def _prepare_dir(self, clean) -> None:
-        dirname = self._frames_dir
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
+        frames_dir = self._frames_dir
+        if not os.path.exists(frames_dir):
+            os.makedirs(frames_dir)
+        images_dir = self._images_dir
+        if not os.path.exists(images_dir):
+            os.makedirs(images_dir)
         if clean:
-            for f in glob.glob(f"{dirname}/t_*.png"):
+            for f in glob.glob(f"{images_dir}/t_*.png"):
                 os.remove(f)
             if os.path.exists(self.moviefile):
                 os.remove(self.moviefile)
@@ -169,7 +173,7 @@ class H1D1Report:
         fig.suptitle(self._title + f" t={t:.3f}")
         self._produce_psiq_frame(t, axs[0], sw_q_data)
         self._produce_psip_frame(t, axs[1], p_data)
-        filename = f"{self._frames_dir}/t_{t:06.3f}_re_im.png"
+        filename = f"{self._images_dir}/t_{t:06.3f}_re_im.png"
         print("writing to file : ", filename)
         fig.savefig(filename)
         plt.close(fig)
@@ -221,7 +225,7 @@ class H1D1Report:
         self._produce_psiq_frame(t, axs[0], sw_q_data)
         self._produce_psip_frame(t, axs[1], p_data)
         self._produce_logpsip_frame(t, axs[2], p_data)
-        filename = f"{self._frames_dir}/t_{t:06.3f}.png"
+        filename = f"{self._images_dir}/t_{t:06.3f}.png"
         print("writing to file : ", filename)
         fig.savefig(filename)
         plt.close(fig)
@@ -331,6 +335,6 @@ class H1D1Report:
     def _produce_video(self):
         print("producing video : ", self.moviefile)
         stream = ffmpeg.input(
-            f"{self._frames_dir}/t_*.png", pattern_type="glob", framerate=8
+            f"{self._images_dir}/t_*.png", pattern_type="glob", framerate=8
         )
         ffmpeg.output(stream, self.moviefile, pix_fmt="yuv420p").run()
