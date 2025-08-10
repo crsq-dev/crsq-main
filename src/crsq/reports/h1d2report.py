@@ -248,7 +248,7 @@ class H1D2Report:
         self._prepare_dir(clean)
 
         self._trace_time = []
-        self._theta_trace = []
+        self._autocorr_trace = []
         self._hk_trace = []
         self._hp_trace = {}
         for key in self._hp.keys():
@@ -645,7 +645,7 @@ class H1D2Report:
         
         if q0_data is not None:
             prod = numpy.vdot(q0_data, q_data).item()
-            self._theta_trace.append(prod)
+            self._autocorr_trace.append(prod)
 
     def _plot_energy(self):
         logger.info("Plotting energy trace")
@@ -673,10 +673,10 @@ class H1D2Report:
         ax.legend()
 
         ax = axs[1]
-        nptheta = numpy.array(self._theta_trace)
-        csvdata["theta.re"] = numpy.real(nptheta)
-        csvdata["theta.im"] = numpy.imag(nptheta)
-        fidelity = numpy.abs(nptheta) ** 2
+        npautocorr = numpy.array(self._autocorr_trace)
+        csvdata["autocorr.re"] = numpy.real(npautocorr)
+        csvdata["autocorr.im"] = numpy.imag(npautocorr)
+        fidelity = numpy.abs(npautocorr) ** 2
         ax.plot(npt, fidelity)
         ax.grid(True)
         ax.set_title("fidelity trace")
@@ -684,7 +684,7 @@ class H1D2Report:
         ax.set_ylabel("|⟨ψ(0)|ψ(t)⟩|**2")
 
         ax = axs[2]
-        pplus = 1/2*(1+numpy.real(nptheta))
+        pplus = 1/2*(1+numpy.real(npautocorr))
         ax.plot(npt, pplus, label="P+")
         ax.grid(True)
         ax.set_title("P+ trace")
