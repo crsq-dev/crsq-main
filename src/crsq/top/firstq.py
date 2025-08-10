@@ -553,9 +553,9 @@ class FirstQIntegrator:
             logger.info("  ElectroPotentialBlock.invoke took. %d ms", round(dt*1000))
 
     def build_elec_potential_block(self, allocate=True, build=True
-                                   ) -> hamiltonian.ElectronPotentialBlock:
+                                   ) -> hamiltonian.ArithElectronPotentialBlock:
         """ build a ElectronPotentialBlock instance."""
-        block = hamiltonian.ElectronPotentialBlock(
+        block = hamiltonian.ArithElectronPotentialBlock(
             self.ham_spec, self.disc_spec, allocate=allocate, build=build)
         return block
 

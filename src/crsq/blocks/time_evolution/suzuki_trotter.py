@@ -40,13 +40,15 @@ class ElectronMotionBlock(heap.Frame):
     """H_ep, QFT, H_ek, QFT\dagger
 
     Electron motion by Suzuki-Trotter decomposition
-    :paramis_last_elec_iter: 
+    :param is_first_elec_iter: whether this is the first electron iteration. dt for H_ep will be half.
+    :param is_last_elec_iter: whether this is the last electron iteration. a final dt/2 * H_ep will be added at the end.
     """
 
     def __init__(
         self,
         evo_spec: spec.TimeEvolutionSpec,
         sim_time: float,
+        is_first_elec_iter: bool = False,
         is_last_elec_iter: bool = False,
         label=" TEV_e(x)",
         allocate=True,
@@ -60,6 +62,7 @@ class ElectronMotionBlock(heap.Frame):
         self._disc_spec = evo_spec.disc_spec
         self._wfr_spec = self._ham_spec.wfr_spec
         self._sim_time = sim_time
+        self._is_first_elec_iter = is_first_elec_iter
         self._is_last_elec_iter = is_last_elec_iter
         # registers
         self._e_index_regs: List[List[QuantumRegister]]
@@ -89,9 +92,9 @@ class ElectronMotionBlock(heap.Frame):
             # so that the circuit size will match the total outer-most circuit size.
             if evo_spec.should_save_p_state_vector and self._is_last_elec_iter:
                 padding_bits = wfr_spec.num_coordinate_bits * wfr_spec.dimension - 1
-                logger.info("[Skipping] Allocating padding registers: %d bits", padding_bits)
-                # self._padding_regs = QuantumRegister(padding_bits, "pad")
-                # self.add_local(self._padding_regs)
+                logger.info("Allocating padding registers: %d bits", padding_bits)
+                self._padding_regs = QuantumRegister(padding_bits, "pad")
+                self.add_local(self._padding_regs)
 
     def build_circuit_on(self, other_frame: heap.Frame):
         """Build the instructions on another compatible quantum circuit."""
@@ -123,7 +126,11 @@ class ElectronMotionBlock(heap.Frame):
             evo_spec.should_calculate_potential_term
             and wfr_spec.has_elec_potential_term
         ):
-            self._build_elec_potential_step()
+            if self._is_first_elec_iter:
+                weight = 0.5
+            else:
+                weight = 1.0
+            self._build_elec_potential_step(weight)
         else:
             logger.info("Skipping electron potential term")
         if evo_spec.should_apply_qft:
@@ -139,6 +146,9 @@ class ElectronMotionBlock(heap.Frame):
                 inverse=False,
                 save_p_state_vector=save_p_state_vector,
             )
+        if self._is_last_elec_iter:
+            weight = 0.5
+            self._build_elec_potential_step(weight)
         logger.info("ElectronMotionBlock.build_circuit end")
 
     def _save_state_vector_with_label(self, key: str):
@@ -149,36 +159,36 @@ class ElectronMotionBlock(heap.Frame):
         self.circuit.save_statevector(label=label)
 
     # ☆☆☆
-    def _build_elec_potential_step(self):
+    def _build_elec_potential_step(self, weight: float):
         method = self._evo_spec.method
         if method == spec.SUZUKI_TROTTER_ARITHMETIC:
-            self._build_elec_potential_step_arithmetic()
+            self._build_elec_potential_step_arithmetic(weight)
         elif method == spec.SUZUKI_TROTTER_QROM:
-            self._build_elec_potential_step_qrom()
+            self._build_elec_potential_step_qrom(weight)
 
-    def _build_elec_potential_step_arithmetic(self):
-        block = self.build_elec_potential_block_arithmetic()
+    def _build_elec_potential_step_arithmetic(self, weight: float):
+        block = self.build_elec_potential_block_arithmetic(weight)
         logger.info(
-            "ElectronPotentialBlock[ARITHMETIC].num_qubits = %d",
-            block.circuit.num_qubits,
+            "ArithElectronPotentialBlock.num_qubits = %d, weight = %f",
+            block.circuit.num_qubits, weight
         )
-        with check_time("ElectronPotentialBlock.invoke"):
+        with check_time("ArithElectronPotentialBlock.invoke"):
             self.invoke(block.bind(eregs=self._e_index_regs, nregs=self._n_index_regs))
 
-    def build_elec_potential_block_arithmetic(self, allocate=True, build=True):
-        """build a ElectronPotentialBlock instance."""
-        block = hamiltonian.ElectronPotentialBlock(
-            self._ham_spec, self._disc_spec, allocate=allocate, build=build
+    def build_elec_potential_block_arithmetic(self, weight: float, allocate=True, build=True):
+        """build an ArithElectronPotentialBlock instance."""
+        block = hamiltonian.ArithElectronPotentialBlock(
+            self._ham_spec, self._disc_spec, weight, allocate=allocate, build=build
         )
         return block
 
-    def _build_elec_potential_step_qrom(self):
+    def _build_elec_potential_step_qrom(self, weight: float):
         block: rfqhamiltonian.RfqElectronPotentialBlock = (
-            self.build_elec_potential_block_qrom()
+            self.build_elec_potential_block_qrom(weight)
         )
         # we cannot save state vector at this point.
         logger.info(
-            "RfqElectronPotentialBlock[QROM].num_qubits = %d", block.circuit.num_qubits
+            "RfqElectronPotentialBlock[QROM].num_qubits = %d, weight=%f", block.circuit.num_qubits, weight
         )
         if self._rfq_spec.should_save_state_vector_per_qrom:
             # pre-allocate the temporary qubits required by the qrom block.
@@ -198,12 +208,13 @@ class ElectronMotionBlock(heap.Frame):
         if self._rfq_spec.should_save_state_vector_per_qrom:
             self._save_state_vector_with_label("qrom1")
 
-    def build_elec_potential_block_qrom(self, allocate=True, build=True):
+    def build_elec_potential_block_qrom(self, weight: float, allocate=True, build=True):
         """build a RfqElectronPotentialBlock instance."""
         block = rfqhamiltonian.RfqElectronPotentialBlock(
             self._evo_spec.rfq_spec,
             self._ham_spec,
             self._disc_spec,
+            weight,
             allocate=allocate,
             build=build,
         )
@@ -445,10 +456,14 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         n_atom_it = evo_spec.num_atom_iterations
         n_elec_it = evo_spec.num_elec_per_atom_iterations
         with qc.for_loop(range(n_atom_it)):
+            elec_it = 0
             with qc.for_loop(range(n_elec_it)):
                 sim_time += delta_t
                 if self._evo_spec.should_calculate_electron_motion:
-                    self._build_electron_motion_step(sim_time, is_final_elec_iter=False)
+                    is_first_elec_iter = (elec_it == 0)
+                    is_last_elec_iter = (elec_it == n_elec_it - 1)
+                    self._build_electron_motion_step(sim_time, is_first_elec_iter, is_last_elec_iter)
+                elec_it += 1
             if self._evo_spec.should_calculate_nucleus_motion:
                 self._build_nuclei_motion_block(sim_time)
 
@@ -461,8 +476,10 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         for _atom_it in range(n_atom_it):
             for _elec_it in range(n_elec_it):
                 sim_time += delta_t
+                is_first_elec_iter = (_elec_it == 0)
+                is_last_elec_iter = (_elec_it == n_elec_it - 1)
                 if evo_spec.should_calculate_electron_motion:
-                    self._build_electron_motion_step(sim_time, is_final_elec_iter=False)
+                    self._build_electron_motion_step(sim_time, is_first_elec_iter, is_last_elec_iter)
             if evo_spec.should_calculate_nucleus_motion:
                 self._build_nuclei_motion_block(sim_time)
 
@@ -492,7 +509,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         # first we need to dry-run the time evolution circuit
         # to make all the temporary qubits allocated.
         logger.info("Saving initial state vector. dryrun electron motion step to allocate registers")
-        self._build_electron_motion_step(0, is_final_elec_iter=False, dry_run=True)
+        self._build_electron_motion_step(0, is_first_elec_iter=False,is_last_elec_iter=False, dry_run=True)
         self._save_state_vector(0.0, label="sv")
         self._build_apply_electron_qft_step(inverse=True)
         self._save_state_vector(0.0, label="qft")
@@ -506,11 +523,15 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         n_atom_it = evo_spec.num_atom_iterations
         n_elec_it = evo_spec.num_elec_per_atom_iterations
         with qc.for_loop(range(n_atom_it)):
+            elec_it = 0
             with qc.for_loop(range(n_elec_it)):
                 sim_time += delta_t
                 logger.info("before electron motion step. sim_time=%f", sim_time)
                 if evo_spec.should_calculate_electron_motion:
-                    self._build_electron_motion_step(sim_time)
+                    is_first_elec_iter = elec_it == 0
+                    is_last_elec_iter = elec_it == n_elec_it - 1
+                    self._build_electron_motion_step(sim_time, is_first_elec_iter, is_last_elec_iter)
+                elec_it += 1
             if evo_spec.should_calculate_nucleus_motion:
                 self._build_nuclei_motion_block(sim_time)
             self._save_state_vector(sim_time)
@@ -526,8 +547,9 @@ class SuzukiTrotterMethodBlock(heap.Frame):
                 sim_time += delta_t
                 logger.info("before electron motion step. sim_time=%f", sim_time)
                 if evo_spec.should_calculate_electron_motion:
-                    is_final_elec_iter = _elec_it == n_elec_it - 1
-                    self._build_electron_motion_step(sim_time, is_final_elec_iter)
+                    is_first_elec_iter = _elec_it == 0
+                    is_last_elec_iter = _elec_it == n_elec_it - 1
+                    self._build_electron_motion_step(sim_time, is_first_elec_iter, is_last_elec_iter)
             if evo_spec.should_calculate_nucleus_motion:
                 self._build_nuclei_motion_block(sim_time)
             self._save_state_vector(sim_time)
@@ -576,14 +598,14 @@ class SuzukiTrotterMethodBlock(heap.Frame):
                 )
             )
 
-    def _build_electron_motion_step(self, sim_time, is_final_elec_iter, dry_run=False):
+    def _build_electron_motion_step(self, sim_time, is_first_elec_iter, is_last_elec_iter, dry_run=False):
         wfr_spec = self._wfr_spec
         if wfr_spec.num_electrons == 0:
             return
         if self._use_motion_block_gates:
             logger.info("Build ElectronMotionBlock:")
             elec_motion_block = self.build_electron_motion_block(
-                sim_time, is_final_elec_iter
+                sim_time, is_first_elec_iter, is_last_elec_iter
             )
             logger.info(
                 "ElectronMotionBlock.num_qubits = %d",
@@ -616,13 +638,13 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         if evo_spec.should_apply_qft:
             self._build_apply_electron_qft_step(dry_run=dry_run)
 
-    def build_electron_motion_block(self, sim_time: float, is_final_elec_iter=False):
+    def build_electron_motion_block(self, sim_time: float, is_first_elec_iter: bool = False, is_last_elec_iter: bool = False):
         # cache the block.
-        dont_cache = self._evo_spec.should_save_p_state_vector and is_final_elec_iter
+        dont_cache = self._evo_spec.should_save_p_state_vector and is_last_elec_iter
         if dont_cache:
             # cannot reuse when if_final_elec_iter is True.:
             elec_motion_block = ElectronMotionBlock(
-                self._evo_spec, sim_time, is_final_elec_iter
+                self._evo_spec, sim_time, is_first_elec_iter, is_last_elec_iter
             )
             return elec_motion_block
         # otherwise cacheable.
@@ -650,7 +672,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
 
     def build_elec_potential_block_arithmetic(self, allocate=True, build=True):
         """build a ElectronPotentialBlock instance."""
-        block = hamiltonian.ElectronPotentialBlock(
+        block = hamiltonian.ArithElectronPotentialBlock(
             self._ham_spec, self._disc_spec, allocate=allocate, build=build
         )
         return block

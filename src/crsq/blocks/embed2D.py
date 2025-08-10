@@ -79,11 +79,11 @@ class StateEmbedGate2D(Frame):
 
         n = self._num_bits
 
-        self._test = np.zeros(1 << n, dtype=np.float64)
-        self._test[0] = 1.0
-        cols = 1 << self._num_cbits
-        for c in range(cols):
-            logger.info("data[0][%d] = (%.16f,%.16f)", c, self._data[c].real, self._data[c].imag)
+        # self._test = np.zeros(1 << n, dtype=np.float64)
+        # self._test[0] = 1.0
+        # cols = 1 << self._num_cbits
+        # for c in range(cols):
+        #     logger.info("data[0][%d] = (%.16f,%.16f)", c, self._data[c].real, self._data[c].imag)
 
         # the top bit is treated differently from the rest,
         # so we cannot use the build_structure_for_bit method here.
@@ -96,9 +96,9 @@ class StateEmbedGate2D(Frame):
         s0 = norms[0][0]
         s1 = norms[1][0]
         theta = 2*math.atan2(s1,s0)
-        nm = math.sqrt(s0*s0 + s1*s1)
-        self._test[p+hp] = self._test[p] * s1/nm
-        self._test[p] = self._test[p] * s0/nm
+        # nm = math.sqrt(s0*s0 + s1*s1)
+        # self._test[p+hp] = self._test[p] * s1/nm
+        # self._test[p] = self._test[p] * s0/nm
 
         avg0 = phases[0][0]
         avg1 = phases[1][0]
@@ -123,8 +123,8 @@ class StateEmbedGate2D(Frame):
             self.build_structure_for_bit(bit-1, p + hp, norms[1][1], phases[1][1])
             qc.cx(self._qreg[bit], self._work[bit-1])
 
-        for c in range(cols):
-            logger.info("test[%d] = %.16f", c, self._test[c])
+        # for c in range(cols):
+        #     logger.info("test[%d] = %.16f", c, self._test[c])
 
     def build_square_tree(self):
         square0 = [(abs(x)*abs(x),) for x in self._data]

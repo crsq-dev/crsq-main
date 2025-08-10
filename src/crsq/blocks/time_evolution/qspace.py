@@ -872,7 +872,7 @@ class QspaceElectronMotionBlock(heap.Frame):
 
     def build_elec_potential_block(self, allocate=True, build=True):
         """ build a ElectronPotentialBlock instance."""
-        block = hamiltonian.ElectronPotentialBlock(
+        block = hamiltonian.ArithElectronPotentialBlock(
             self._ham_spec, self._disc_spec, allocate=allocate, build=build)
         return block
 

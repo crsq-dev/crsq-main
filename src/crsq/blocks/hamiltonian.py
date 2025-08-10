@@ -138,11 +138,13 @@ class PotentialBlockBase(heap.Frame):
         self,
         ham_spec: HamiltonianSpec,
         disc_spec: discretization.DiscretizationSpec,
+        weight: float,
         label,
     ):
         super().__init__(label=label)
         self._ham_spec = ham_spec
         self._wfr_spec = ham_spec.wfr_spec
+        self._weight = weight
         self._disc_spec = disc_spec
         self._diff_zero_ancilla_reg: QuantumRegister
         self._diff_stash_reg: QuantumRegister
@@ -151,7 +153,7 @@ class PotentialBlockBase(heap.Frame):
         reg = quotient.register
         frac_bits = quotient.fraction_bits
         qc = self.circuit
-        delta_t = self._disc_spec.delta_t
+        delta_t = self._disc_spec.delta_t * self._weight
         delta_q = self._wfr_spec.delta_q
         for i in range(reg.size):
             digit_weight = 2 ** (i - frac_bits)
@@ -197,17 +199,18 @@ class PotentialBlockBase(heap.Frame):
                 )
 
 
-class ElectronPotentialBlock(PotentialBlockBase):
+class ArithElectronPotentialBlock(PotentialBlockBase):
     """electron-electron and electron-nucleus potential term"""
 
     def __init__(
         self,
         ham_spec: HamiltonianSpec,
         disc_spec: discretization.DiscretizationSpec,
+        weight: float,
         allocate=True,
         build=True,
     ):
-        super().__init__(ham_spec, disc_spec, label="  Θ_ep")
+        super().__init__(ham_spec, disc_spec, weight, label="  Θ_ep")
         self._eregs: List[List[List[QuantumRegister]]] = []
         self._nregs: List[List[List[QuantumRegister]]] = []
         self._vx_const_numerator_reg: QuantumRegister

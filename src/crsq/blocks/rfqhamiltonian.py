@@ -105,6 +105,7 @@ class RfqElectronPotentialBlock(heap.Frame):
         rfq_spec: RfqPotentialSpec,
         ham_spec: hamiltonian.HamiltonianSpec,
         disc_spec: discretization.DiscretizationSpec,
+        weight: float,
         allocate=True,
         build=True,
     ):
@@ -114,6 +115,7 @@ class RfqElectronPotentialBlock(heap.Frame):
         self._wfr_spec = ham_spec.wfr_spec
         wfr_spec = ham_spec.wfr_spec
         self._disc_spec = disc_spec
+        self._weight = weight
         self._eregs: List[List[List[QuantumRegister]]] = []
         self._nregs: List[List[List[QuantumRegister]]] = []
         if wfr_spec.num_moving_nuclei > 0:
@@ -158,14 +160,14 @@ class RfqElectronPotentialBlock(heap.Frame):
             -delta_t * Vee(q)
         """
         r = abs(qdiff)
-        return -self._disc_spec.delta_t * self._rfq_spec.elec_elec_potential_func(r)
+        return -self._disc_spec.delta_t * self._rfq_spec.elec_elec_potential_func(r) * self._weight
 
     def _elec_elec_phase_shift_2d(self, qxdiff: float, qydiff: float):
         """ calculate -δt*Vee(r)/hbar, where r=sqrt(qxdiff**2 + qydiff**2)
             -delta_t * Vee(q)
         """
         r = math.sqrt(qxdiff*qxdiff + qydiff*qydiff)
-        return -self._disc_spec.delta_t * self._rfq_spec.elec_elec_potential_func(r)
+        return -self._disc_spec.delta_t * self._rfq_spec.elec_elec_potential_func(r) * self._weight
 
     def _elec_nucl_phase_shift_1d(self, q: float):
         """ calculate -δt*Ven(q)/hbar
