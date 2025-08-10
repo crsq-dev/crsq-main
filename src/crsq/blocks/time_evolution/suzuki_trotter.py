@@ -40,6 +40,7 @@ class ElectronMotionBlock(heap.Frame):
     """H_ep, QFT, H_ek, QFT\dagger
 
     Electron motion by Suzuki-Trotter decomposition
+    :paramis_last_elec_iter: 
     """
 
     def __init__(
@@ -88,9 +89,9 @@ class ElectronMotionBlock(heap.Frame):
             # so that the circuit size will match the total outer-most circuit size.
             if evo_spec.should_save_p_state_vector and self._is_last_elec_iter:
                 padding_bits = wfr_spec.num_coordinate_bits * wfr_spec.dimension - 1
-                logger.info("Allocating padding registers: %d bits", padding_bits)
-                self._padding_regs = QuantumRegister(padding_bits, "pad")
-                self.add_local(self._padding_regs)
+                logger.info("[Skipping] Allocating padding registers: %d bits", padding_bits)
+                # self._padding_regs = QuantumRegister(padding_bits, "pad")
+                # self.add_local(self._padding_regs)
 
     def build_circuit_on(self, other_frame: heap.Frame):
         """Build the instructions on another compatible quantum circuit."""
@@ -471,9 +472,6 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         n_elec_it = evo_spec.num_elec_per_atom_iterations
         sim_time = 0.0
         delta_t = self._evo_spec.disc_spec.delta_t
-        # cannot save state vector for t=0.
-        # we need to go through the circuit one loop to get all registers allocated.
-        # self._save_state_vector(time)
 
         if evo_spec.should_save_q_state_vector:
             self._save_initial_q_vector()
@@ -493,7 +491,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         """save the initial state vector."""
         # first we need to dry-run the time evolution circuit
         # to make all the temporary qubits allocated.
-        logger.info("Saving initial state vector")
+        logger.info("Saving initial state vector. dryrun electron motion step to allocate registers")
         self._build_electron_motion_step(0, is_final_elec_iter=False, dry_run=True)
         self._save_state_vector(0.0, label="sv")
         self._build_apply_electron_qft_step(inverse=True)
