@@ -113,43 +113,72 @@ class ElectronMotionBlock(heap.Frame):
         """build the gates for time evolution.
         There are several variations for this.
         """
-        save_p_state_vector = (
-            self._is_last_elec_iter and self._evo_spec.should_save_p_state_vector
-        )
         logger.info(
-            "ElectronMotionBlock.build_circuit(save_qft_state_vector = %s) start",
-            save_p_state_vector,
+            "ElectronMotionBlock.build_circuit start",
         )
+        if self._is_first_elec_iter:
+            self._build_first_elec_iter()
+        elif self._is_last_elec_iter:
+            self._build_last_elec_iter()
+        else:
+            self._build_middle_elec_iter()
+        logger.info("ElectronMotionBlock.build_circuit end")
+
+    def _build_first_elec_iter(self):
+        logger.info("First electron iteration")
+        wfr_spec = self._wfr_spec
+        evo_spec = self._evo_spec
+        weight = 0.5
+        if (
+            evo_spec.should_calculate_potential_term
+            and wfr_spec.has_elec_potential_term
+        ):
+            self._build_elec_potential_step(weight)
+        else:
+            logger.info("Skipping electron potential term")
+
+    def _build_middle_elec_iter(self):
+        logger.info("Middle electron iteration")
+        wfr_spec = self._wfr_spec
+        evo_spec = self._evo_spec
+        weight = 1.0
+        if (
+            evo_spec.should_calculate_potential_term
+            and wfr_spec.has_elec_potential_term
+        ):
+            self._build_elec_potential_step(weight)
+        else:
+            logger.info("Skipping electron potential term")
+
+        if evo_spec.should_apply_qft:
+            self._build_apply_electron_qft_step(inverse=True, save_p_state_vector=False)
+        else:
+            logger.info("Skipping electron qft")
+
+        if evo_spec.should_calculate_kinetic_term:
+            self._build_elec_kinetic_step()
+        else:
+            logger.info("Skipping electron kinetic term")
+
+        if evo_spec.should_apply_qft:
+            self._build_apply_electron_qft_step(inverse=False, save_p_state_vector=False)
+
+    def _build_last_elec_iter(self):
+        logger.info("Last electron iteration")
         wfr_spec = self._wfr_spec
         evo_spec = self._evo_spec
         if (
             evo_spec.should_calculate_potential_term
             and wfr_spec.has_elec_potential_term
         ):
-            if self._is_first_elec_iter:
-                weight = 0.5
-            else:
-                weight = 1.0
-            self._build_elec_potential_step(weight)
-        else:
-            logger.info("Skipping electron potential term")
-        if evo_spec.should_apply_qft:
-            self._build_apply_electron_qft_step(inverse=True, save_p_state_vector=False)
-        else:
-            logger.info("Skipping electron qft")
-        if evo_spec.should_calculate_kinetic_term:
-            self._build_elec_kinetic_step()
-        else:
-            logger.info("Skipping electron kinetic term")
-        if evo_spec.should_apply_qft:
-            self._build_apply_electron_qft_step(
-                inverse=False,
-                save_p_state_vector=save_p_state_vector,
-            )
-        if self._is_last_elec_iter:
             weight = 0.5
             self._build_elec_potential_step(weight)
-        logger.info("ElectronMotionBlock.build_circuit end")
+        if evo_spec.should_apply_qft:
+            self._build_apply_electron_qft_step(inverse=True, save_p_state_vector=False)
+            self._build_apply_electron_qft_step(inverse=False, save_p_state_vector=True)
+        else:
+            logger.info("Skipping electron qft")
+
 
     def _save_state_vector_with_label(self, key: str):
         label = self._evo_spec.make_state_vector_label(self._sim_time, key)
@@ -514,6 +543,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         self._build_apply_electron_qft_step(inverse=True)
         self._save_state_vector(0.0, label="qft")
         self._build_apply_electron_qft_step()
+        logger.info("Saving initial state vector done.")
 
     def _build_time_evolution_circuit_with_save_for_loop_gate(
         self, n_atom_it, n_elec_it, sim_time, delta_t
@@ -545,7 +575,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         for _atom_it in range(n_atom_it):
             for _elec_it in range(n_elec_it):
                 sim_time += delta_t
-                logger.info("before electron motion step. sim_time=%f", sim_time)
+                logger.info("before electron motion step[nn=%d,ne=%d]. sim_time=%f", _atom_it, _elec_it, sim_time)
                 if evo_spec.should_calculate_electron_motion:
                     is_first_elec_iter = _elec_it == 0
                     is_last_elec_iter = _elec_it == n_elec_it - 1
@@ -640,9 +670,10 @@ class SuzukiTrotterMethodBlock(heap.Frame):
 
     def build_electron_motion_block(self, sim_time: float, is_first_elec_iter: bool = False, is_last_elec_iter: bool = False):
         # cache the block.
-        dont_cache = self._evo_spec.should_save_p_state_vector and is_last_elec_iter
+        dont_cache = self._evo_spec.should_save_p_state_vector and (is_first_elec_iter or is_last_elec_iter)
         if dont_cache:
             # cannot reuse when if_final_elec_iter is True.:
+            logger.info("Create new ElectronMotionBlock (not cached).")
             elec_motion_block = ElectronMotionBlock(
                 self._evo_spec, sim_time, is_first_elec_iter, is_last_elec_iter
             )
@@ -652,6 +683,9 @@ class SuzukiTrotterMethodBlock(heap.Frame):
             self._elec_motion_block = ElectronMotionBlock(
                 self._evo_spec, sim_time, False
             )
+            logger.info("Created and cached ElectronMotionBlock.")
+        else:
+            logger.info("Reusing cached ElectronMotionBlock.")
         return self._elec_motion_block
 
     def _build_elec_potential_step(self, dry_run=False):

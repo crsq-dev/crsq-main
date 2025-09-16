@@ -169,6 +169,13 @@ class RfqElectronPotentialBlock(heap.Frame):
         r = math.sqrt(qxdiff*qxdiff + qydiff*qydiff)
         return -self._disc_spec.delta_t * self._rfq_spec.elec_elec_potential_func(r) * self._weight
 
+    def _elec_elec_phase_shift_3d(self, qxdiff: float, qydiff: float, qzdiff: float):
+        """ calculate -δt*Vee(r)/hbar, where r=sqrt(qxdiff**2 + qydiff**2 + qzdiff**2)
+            -delta_t * Vee(q)
+        """
+        r = math.sqrt(qxdiff*qxdiff + qydiff*qydiff + qzdiff*qzdiff)
+        return -self._disc_spec.delta_t * self._rfq_spec.elec_elec_potential_func(r) * self._weight
+
     def _elec_nucl_phase_shift_1d(self, q: float):
         """ calculate -δt*Ven(q)/hbar
             -delta_t * Ven(q)
@@ -176,7 +183,7 @@ class RfqElectronPotentialBlock(heap.Frame):
         L = self._wfr_spec.space_length
         r = abs(((q - self._Q0) + L/2) % L - L/2)
         # logger.info("elec_nucl_phase_shift_1d: q = %f Q0 = %f r=%f", q, self._Q0, r)
-        return -self._disc_spec.delta_t * self._rfq_spec.elec_nucl_potential_func(r)
+        return -self._disc_spec.delta_t * self._rfq_spec.elec_nucl_potential_func(r) * self._weight
 
     def _elec_nucl_phase_shift_2d(self, x: float, y: float) -> float:
         """ calculate -δt*Ven(q)/hbar
@@ -185,7 +192,7 @@ class RfqElectronPotentialBlock(heap.Frame):
         dx = x - self._Q0[0]
         dy = y - self._Q0[1]
         r = math.sqrt(dx*dx + dy*dy)
-        return -self._disc_spec.delta_t * self._rfq_spec.elec_nucl_potential_func(r)
+        return -self._disc_spec.delta_t * self._rfq_spec.elec_nucl_potential_func(r) * self._weight
 
     def _elec_nucl_phase_shift_3d(self, qx: float, qy:float, qz:float):
         """ calculate -δt*Ven(q)/hbar
@@ -195,7 +202,7 @@ class RfqElectronPotentialBlock(heap.Frame):
         dqy = qy - self._Q0[1]
         dqz = qz - self._Q0[2]
         r = math.sqrt(dqx*dqx + dqy*dqy + dqz*dqz)
-        return -self._disc_spec.delta_t * self._rfq_spec.elec_nucl_potential_func(r)
+        return -self._disc_spec.delta_t * self._rfq_spec.elec_nucl_potential_func(r) * self._weight
 
     def _build_elec_elec_potential_terms(self):
         wfr_spec = self._wfr_spec
@@ -276,7 +283,7 @@ class RfqElectronPotentialBlock(heap.Frame):
                 z1r -= z2r
                 scope.build_circuit()
 
-                self._apply_radial_func_qrom_3d(x1r, y1r, z1r, self._elec_elec_phase_shift_2d)
+                self._apply_radial_func_qrom_3d(x1r, y1r, z1r, self._elec_elec_phase_shift_3d)
 
                 scope.build_inverse_circuit()
 

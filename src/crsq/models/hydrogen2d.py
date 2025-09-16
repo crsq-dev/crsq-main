@@ -277,16 +277,16 @@ class PsiH2DRadial:
 
 
 class VHAtom2:
-    """V(x) for H atom. potential function object - 2D version"""
+    """V(x) for H atom. potential function object - 2D numpy version"""
 
     def __init__(self, Qx0: float, Qy0: float, dq: float, r0: float, Z: float, eps=0):
         """
             arguments:
                 Qx0, Qy0: float : center of the potential
                 dq: float : offset added to avoid division by zero
-                r0: float : distance from the center of the potential to the pole
+                r0: float : Δ1 for Ha1 potential function (Ha1(r)=1/Δ1 for r = 0, 1/r for r > 0) for r0lim pole mitigation
                 Z: float : charge of the nucleus
-                eps: float : offset added to avoid division by zero (for rofs pole mitigation)
+                eps: float : Δ1 for Ha2 potential function (Ha2(r)=1/sqrt(r^2+Δ1^2) for rofs pole mitigation
         """
         self._Qx0 = Qx0
         self._Qy0 = Qy0
