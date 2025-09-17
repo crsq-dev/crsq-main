@@ -22,6 +22,7 @@ class TimeEvolutionSpec:
                  num_atom_iterations: int,
                  num_elec_per_atom_iterations: int,
                  method: str = SUZUKI_TROTTER_ARITHMETIC,
+                 trotter_order: int = 1,
                  rfq_spec: rfqhamiltonian.RfqPotentialSpec = None,
                  save_q_state_vector: bool = False,
                  save_p_state_vector: bool = False,
@@ -51,6 +52,7 @@ class TimeEvolutionSpec:
         if method == SUZUKI_TROTTER_QROM and rfq_spec is None:
             raise ValueError("rfq_spec is required when method is SUZUKI_TROTTER_QROM")
         self._method = method
+        self._trotter_order = trotter_order
         self._rfq_spec = rfq_spec
         logger.info(f"should_save_q_state_vector: {self._should_save_q_state_vector}")
         logger.info(f"should_save_p_state_vector: {self._should_save_p_state_vector}")
@@ -70,6 +72,11 @@ class TimeEvolutionSpec:
     def rfq_spec(self) -> rfqhamiltonian.RfqPotentialSpec:
         """ rfq potential spec """
         return self._rfq_spec
+    
+    @property
+    def trotter_order(self) -> int:
+        """ order of the Trotter decomposition """
+        return self._trotter_order
 
     @property
     def should_use_rfq_gray_code(self) -> bool:
