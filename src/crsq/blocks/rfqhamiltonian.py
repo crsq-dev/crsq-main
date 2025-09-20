@@ -129,11 +129,11 @@ class RfqElectronPotentialBlock(heap.Frame):
         elif wfr_spec.dimension == 2:
             Xq0, Yq0 = ham_spec.nuclei_data[0]["pos"]
             self._Q0 = [wfr_spec.delta_q * Xq0, wfr_spec.delta_q * Yq0]
-            logger.info("RfqElectronPotentialBlock: Xq0 = %d, Yq0 = %d, Q0=%s", Xq0, Yq0, self._Q0)
+            logger.info("RfqElectronPotentialBlock: Xq0 = %d, Yq0 = %d, Q0=%s, weight=%f", Xq0, Yq0, self._Q0, weight)
         elif wfr_spec.dimension == 1:
             Xq0 = ham_spec.nuclei_data[0]["pos"]
             self._Q0 = wfr_spec.delta_q * Xq0
-            logger.info("RfqElectronPotentialBlock: Xq0 = %d, Q0=%s", Xq0, self._Q0)
+            logger.info("RfqElectronPotentialBlock: Xq0 = %d, Q0=%s, weight=%f", Xq0, self._Q0, weight)
         else:
             raise NotImplementedError("Dimension > 2 is not implemented yet.")
         if allocate:
@@ -306,7 +306,7 @@ class RfqElectronPotentialBlock(heap.Frame):
                 "1D radial function QROM without graycode is not implemented yet."
             )
 
-    def _apply_radial_func_qrom_2d(self, xr: ast.Register, yr: ast.Register, rfunc2d: Callable[[int, int], float]):
+    def _apply_radial_func_qrom_2d(self, xr: ast.Register, yr: ast.Register, rfunc2d: Callable[[float, float], float]):
         wfr_spec = self._wfr_spec
         rfq_spec = self._rfq_spec
         if rfq_spec.should_use_gray_code:
@@ -377,7 +377,7 @@ class RfqElectronPotentialBlock(heap.Frame):
                     logger.info("  Ven(%d,%d) done. %d msec", ie, ia, round(dt * 1000))
 
     def _build_elec_nucl_potential_terms_2d(self):
-        logger.info("_build_elec_nucl_potential_terms_2d")
+        logger.info("_build_elec_nucl_potential_terms_2d : weight=%f", self._weight)
         wfr_spec = self._wfr_spec
         # TODO : moving atoms are not implemented yet.
         if wfr_spec.num_moving_nuclei > 0:

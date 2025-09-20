@@ -93,7 +93,7 @@ class ElectronMotionBlock(heap.Frame):
             self.add_param(self._target)
             # additionally, we want to allocate padding registers when saving state vector.
             # so that the circuit size will match the total outer-most circuit size.
-            if evo_spec.should_save_p_state_vector and self._is_last_elec_iter:
+            if evo_spec.should_save_p_state_vector:
                 padding_bits = wfr_spec.num_coordinate_bits * wfr_spec.dimension - 1
                 logger.info("Allocating padding registers: %d bits", padding_bits)
                 self._padding_regs = QuantumRegister(padding_bits, "pad")
@@ -251,11 +251,11 @@ class ElectronMotionBlock(heap.Frame):
         block: rfqhamiltonian.RfqElectronPotentialBlock = (
             self.build_elec_potential_block_qrom(weight)
         )
-        # we cannot save state vector at this point.
         logger.info(
             "RfqElectronPotentialBlock[QROM].num_qubits = %d, weight=%f", block.circuit.num_qubits, weight
         )
-        if self._rfq_spec.should_save_state_vector_per_qrom:
+        # we cannot save state vector at this point.
+        if self._rfq_spec.should_save_state_vector_per_qrom and weight == 0.5:
             # pre-allocate the temporary qubits required by the qrom block.
             t = self._temp_allocator.allocate(block._temp_allocator.size, "tmp")
             self._temp_allocator.free(t)
@@ -270,7 +270,7 @@ class ElectronMotionBlock(heap.Frame):
             else:
                 bound = block.bind(eregs=self._e_index_regs, nregs=self._n_index_regs)
             self.invoke(bound, invoke_as_instruction=True)
-        if self._rfq_spec.should_save_state_vector_per_qrom:
+        if self._rfq_spec.should_save_state_vector_per_qrom and weight == 0.5:
             self._save_state_vector_with_label("qrom1")
 
     def build_elec_potential_block_qrom(self, weight: float, allocate=True, build=True):
@@ -625,6 +625,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
                     else:
                         initial_v_weight = 0.5
                     self._build_electron_motion_step(sim_time, is_first_elec_iter, is_last_elec_iter, initial_v_weight)
+                    logger.info("global phase after electron motion: %f", self.circuit.global_phase)
             if evo_spec.should_calculate_nucleus_motion:
                 self._build_nuclei_motion_block(sim_time)
             self._save_state_vector(sim_time)

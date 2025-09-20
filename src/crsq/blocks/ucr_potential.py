@@ -179,6 +179,7 @@ class UCRPotential2d(Frame):
         alpha = self._data
         indexbits = QuantumRegister(name="x", bits=self._x[:] + self._y[:])
         use_ucrz_gate = True
+        # use_ucrz_gate = False # For Testing
         if use_ucrz_gate:
             ucrz = UCRZGate(alpha.tolist())
             self.circuit.append(ucrz, self._t[:] + indexbits[:])
