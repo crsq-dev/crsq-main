@@ -56,16 +56,20 @@ class QFTOnWaveFunctionsBlock(heap.Frame):
         qc = self.circuit
 
         num_bits = wfr_spec.num_coordinate_bits
+        if self._inverse:
+            qftgate = circuit_lib.QFTGate(num_bits).inverse()
+        else:
+            qftgate = circuit_lib.QFTGate(num_bits)
         if self._on_electrons:
             for elec in self._eregs:
                 # the MSB of the electron index is for the spin,
                 # and should be excluded from the QFT.
                 for d in range(wfr_spec.dimension):
-                    qc.append(circuit_lib.QFT(num_bits, inverse=self._inverse), elec[d][:])
+                    qc.append(qftgate, elec[d][:])
         if self._on_nuclei:
             for nuc in self._nregs:
                 for d in range(wfr_spec.dimension):
-                    qc.append(circuit_lib.QFT(num_bits, inverse=self._inverse), nuc[d][:])
+                    qc.append(qftgate, nuc[d][:])
 
     def bind(self,
              eregs: List[List[List[QuantumRegister]]]|None = None,

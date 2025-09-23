@@ -269,7 +269,7 @@ class ElectronMotionBlock(heap.Frame):
                 )
             else:
                 bound = block.bind(eregs=self._e_index_regs, nregs=self._n_index_regs)
-            self.invoke(bound, invoke_as_instruction=True)
+            self.invoke(bound)
         if self._rfq_spec.should_save_state_vector_per_qrom and weight == 0.5:
             self._save_state_vector_with_label("qrom1")
 
@@ -300,9 +300,7 @@ class ElectronMotionBlock(heap.Frame):
         )
         # The QFT block contains non-gate instructions.
         with check_time("QFTOnWaveFunctionsBlock(e).invoke"):
-            self.invoke(
-                qft_block.bind(eregs=self._e_index_regs), invoke_as_instruction=True
-            )
+            self.invoke(qft_block.bind(eregs=self._e_index_regs))
         # if inverse and self._evo_spec.should_save_state_vector_per_qft:
         #     # record after qft dagger
         #     self._save_state_vector_with_suffix("_qft")
@@ -404,9 +402,7 @@ class NucleusMotionBlock(heap.Frame):
         )
         # The QFT block contains non-gate instructions.
         with check_time("QFTOnWaveFunctionsBlock(n).invoke"):
-            self.invoke(
-                block.bind(nregs=self._n_index_regs), invoke_as_instruction=True
-            )
+            self.invoke(block.bind(nregs=self._n_index_regs))
 
     def _build_nuclei_kinetic_step(self):
         block = hamiltonian.NucleusKineticBlock(
@@ -774,7 +770,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
                 )
             else:
                 bound = block.bind(eregs=self._e_index_regs, nregs=self._n_index_regs)
-            self.invoke(bound, invoke_as_instruction=True)
+            self.invoke(bound)
 
     def build_elec_potential_block_qrom(self, allocate=True, build=True):
         """build a RfqElectronPotentialBlock instance."""
@@ -794,9 +790,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         )
         # The QFT block contains non-gate instructions.
         with check_time("QFTOnWaveFunctionsBlock(e).invoke"):
-            self.invoke(
-                block.bind(eregs=self._e_index_regs), invoke_as_instruction=True, dry_run=dry_run
-            )
+            self.invoke(block.bind(eregs=self._e_index_regs), dry_run=dry_run)
 
     def _build_nuclei_motion_block(self, sim_time: float):
         if self._wfr_spec.num_moving_nuclei == 0:
@@ -804,10 +798,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         if self._use_motion_block_gates:
             nucl_motion_block = NucleusMotionBlock(self._evo_spec, sim_time)
             with check_time("NucleusMotionBlock.invoke"):
-                self.invoke(
-                    nucl_motion_block.bind(nregs=self._n_index_regs),
-                    invoke_as_instruction=True,
-                )
+                self.invoke(nucl_motion_block.bind(nregs=self._n_index_regs))
             return
 
         evo_spec = self._evo_spec
@@ -835,9 +826,7 @@ class SuzukiTrotterMethodBlock(heap.Frame):
         )
         # The QFT block contains non-gate instructions.
         with check_time("QFTOnWaveFunctionsBlock(n).invoke"):
-            self.invoke(
-                block.bind(nregs=self._n_index_regs), invoke_as_instruction=True
-            )
+            self.invoke(block.bind(nregs=self._n_index_regs))
 
     def _build_elec_kinetic_step(self):
         block = hamiltonian.ElectronKineticBlock(self._wfr_spec, self._disc_spec, dry_run=False)

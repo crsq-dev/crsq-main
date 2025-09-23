@@ -323,7 +323,7 @@ class RfqElectronPotentialBlock(heap.Frame):
                 use_transpose=rfq_spec.should_use_transpose,
             )
             self.invoke(
-                rfq.bind(x=xr.register, y=yr.register), invoke_as_instruction=True
+                rfq.bind(x=xr.register, y=yr.register)
             )
 
     def _apply_radial_func_qrom_3d(self, xr: ast.Register, yr: ast.Register, zr: ast.Register, rfunc3d: Callable[[float, float, float], float]):
