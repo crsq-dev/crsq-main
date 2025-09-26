@@ -6,5 +6,6 @@ scipy
 pandas
 qiskit[visualization]
 qiskit-aer
+qiskit-ibm-runtime
 ffmpeg-python
 jupyter
