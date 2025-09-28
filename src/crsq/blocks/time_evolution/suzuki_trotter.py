@@ -240,7 +240,7 @@ class ElectronMotionBlock(heap.Frame):
         with check_time("ArithElectronPotentialBlock.invoke"):
             self.invoke(block.bind(eregs=self._e_index_regs, nregs=self._n_index_regs))
 
-    def build_elec_potential_block_arithmetic(self, weight: float, allocate=True, build=True):
+    def build_elec_potential_block_arithmetic(self, weight: float = 1.0, allocate=True, build=True):
         """build an ArithElectronPotentialBlock instance."""
         block = hamiltonian.ArithElectronPotentialBlock(
             self._ham_spec, self._disc_spec, weight, allocate=allocate, build=build
