@@ -220,7 +220,7 @@ class H1D1Report:
         energy_df.to_csv(csv_filename, index=True, index_label='t', header=True, float_format="%.6f")
 
     def _produce_video_frame(self, t: float, sw_q_data, p_data):
-        fig, axs = plt.subplots(3, 1, figsize=(8, 12), layout="constrained")
+        fig, axs = plt.subplots(3, 1, figsize=(6, 9), layout="constrained")
         fig.suptitle(self._title + f" t={t:.3f}")
         self._produce_psiq_frame(t, axs[0], sw_q_data)
         self._produce_psip_frame(t, axs[1], p_data)
