@@ -52,7 +52,7 @@ class ElectronMotionBlock(heap.Frame):
         is_first_elec_iter: bool = False,
         is_last_elec_iter: bool = False,
         initial_v_weight: float = 1.0,
-        label=" TEV_e(x)",
+        label=" Θ_e(x)",
         allocate=True,
         build=True,
     ):
@@ -337,7 +337,7 @@ class NucleusMotionBlock(heap.Frame):
         self,
         evo_spec: spec.TimeEvolutionSpec,
         sim_time: float,
-        label=" TEV_n(x)",
+        label=" Θ_n(x)",
         allocate=True,
         build=True,
     ):
@@ -526,7 +526,9 @@ class SuzukiTrotterMethodBlock(heap.Frame):
                 if self._evo_spec.should_calculate_electron_motion:
                     self._build_electron_motion_step(sim_time, is_first_elec_iter, is_last_elec_iter, 1.0)
                 elec_it += 1
-            self._build_electron_motion_step(sim_time, False, True, 1.0)
+            # for trotter order 2, we need to do final electron motion step here.
+            if evo_spec.trotter_order == 2 and evo_spec.should_calculate_electron_motion:
+                self._build_electron_motion_step(sim_time, False, True, 1.0)
             if self._evo_spec.should_calculate_nucleus_motion:
                 self._build_nuclei_motion_block(sim_time)
 
@@ -794,8 +796,10 @@ class SuzukiTrotterMethodBlock(heap.Frame):
 
     def _build_nuclei_motion_block(self, sim_time: float):
         if self._wfr_spec.num_moving_nuclei == 0:
+            logger.info("Skipping nuclei motion block: no moving nuclei.")
             return
         if self._use_motion_block_gates:
+            logger.info("Build NucleusMotionBlock:")
             nucl_motion_block = NucleusMotionBlock(self._evo_spec, sim_time)
             with check_time("NucleusMotionBlock.invoke"):
                 self.invoke(nucl_motion_block.bind(nregs=self._n_index_regs))

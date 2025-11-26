@@ -812,7 +812,7 @@ class QspaceElectronMotionBlock(heap.Frame):
     def __init__(self,
                  tev_spec: spec.TimeEvolutionSpec,
                  q_spec: QSpaceTEVSpec,
-                 label=" TEV_e(x)", allocate=True, build=True):
+                 label=" Θ_e(x)", allocate=True, build=True):
         super().__init__(label=label)
         t1 = time.time()
         self._tev_spec = tev_spec
@@ -905,7 +905,7 @@ class QspaceNucleusMotionBlock(heap.Frame):
     def __init__(self,
                  tev_spec: spec.TimeEvolutionSpec,
                  q_spec: QSpaceTEVSpec,
-                 label=" TEV_n(x)", allocate=True, build=True):
+                 label=" Θ_n(x)", allocate=True, build=True):
         super().__init__(label=label)
         self._tev_spec = tev_spec
         self._q_spec = q_spec
