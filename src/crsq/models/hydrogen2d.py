@@ -345,19 +345,22 @@ class VHAtom2:
         if self._eps > 0:
             return self._calc_with_eps(x, y)
 
+        xq0 = int(self._Qx0 / self._dq)
+        yq0 = int(self._Qy0 / self._dq)
+
         if self._r0 <= 0:
             riA = numpy.sqrt(
                 (numpy.square(x - self._Qx0) + numpy.square(y - self._Qy0))
             )
         else:
             # emulate fixed point calculation with frac_bits
-            rsq = numpy.square(x - self._Qx0) + numpy.square(y - self._Qy0)
             scale = 2 ** self._frac_bits
             hscale = 2 ** (self._frac_bits // 2)
-            riA = numpy.floor(numpy.sqrt(numpy.floor(rsq*scale))) / hscale
+            xq = numpy.floor(x / self._dq).astype(numpy.int32)
+            yq = numpy.floor(y / self._dq).astype(numpy.int32)
+            rsqq = numpy.square(xq - xq0) + numpy.square(yq - yq0)
+            riA = self._dq * numpy.floor(numpy.sqrt(rsqq * scale)) / hscale
 
-        xq0 = int(self._Qx0 / self._dq)
-        yq0 = int(self._Qy0 / self._dq)
         riA[xq0, yq0] = self._r0
         logger.info("VHAtom2.Hp0 = %f", 1 / self._r0)
         qe = -1

@@ -70,6 +70,7 @@ class HamiltonianSpec:
             "HamiltonianSpec: num_v_numerator_int_bits = %d",
             self._num_v_numerator_int_bits,
         )
+        logger.info("HamiltonianSpec: should_use_div_bits_optimization = %s", self._should_use_div_bits_optimization)
 
     def set_should_apply_potential_to_phase(self, flag):
         """set flag to enable function"""
@@ -395,12 +396,22 @@ class ArithElectronPotentialBlock(PotentialBlockBase):
                         ast_squares.append(ast_sq)
                         if d > 0:
                             ast_squares[0] += ast_squares[d]  # sum
-                    ast_dist = ex_scope.square_root(ast_squares[0])
+                        if wfr_spec.num_frac_bits > 0:
+                            # add bits for fraction part
+                            num_sq_frac_bits = wfr_spec.num_frac_bits * 2  # for squared vaules
+                            frac_qubits = self.allocate_ancilla_bits(num_sq_frac_bits, f"frac")
+                            old_total_bits = ast_squares[0].total_bits
+                            square_with_frac = ast_squares[0].adjust_precision(
+                                old_total_bits + num_sq_frac_bits, num_sq_frac_bits, new_low_bits=frac_qubits
+                            )
+                        else:
+                            square_with_frac = ast_squares[0]
+                    ast_dist = ex_scope.square_root(square_with_frac)
 
                 in_scope = ast.new_scope(self)
                 n = wfr_spec.num_coordinate_bits
                 m = ham_spec.num_v_numerator_int_bits # always 1
-                numerator_frac_bits = n + 1 - m  # always n
+                numerator_frac_bits = n + 1 - m + wfr_spec.num_frac_bits
 
                 ex_scope.build_circuit()
 
@@ -531,7 +542,7 @@ class ArithElectronPotentialBlock(PotentialBlockBase):
         """build e-n potential terms
         reuse short-lived temporary qubits as ancillas with non-overlapping lifetimes.
         """
-
+        logger.info("ArithElectronPotentialBlock._build_elec_nucl_potential_terms_optimized")
         wfr_spec = self._wfr_spec
         ham_spec = self._ham_spec
         nuclei_data = ham_spec.nuclei_data
@@ -558,12 +569,22 @@ class ArithElectronPotentialBlock(PotentialBlockBase):
                         ast_squares.append(ast_sq)
                         if d > 0:
                             ast_squares[0] += ast_squares[d]  # sum
-                    ast_dist = ex_scope.square_root(ast_squares[0])
+                        if wfr_spec.num_frac_bits > 0:
+                            # add bits for fraction part
+                            num_sq_frac_bits = wfr_spec.num_frac_bits * 2  # for squared vaules
+                            frac_qubits = self.allocate_ancilla_bits(num_sq_frac_bits, f"frac")
+                            old_total_bits = ast_squares[0].total_bits
+                            square_with_frac = ast_squares[0].adjust_precision(
+                                old_total_bits + num_sq_frac_bits, num_sq_frac_bits, new_low_bits=frac_qubits
+                            )
+                        else:
+                            square_with_frac = ast_squares[0]
+                    ast_dist = ex_scope.square_root(square_with_frac)
 
                 in_scope = ast.new_scope(self)
                 n = wfr_spec.num_coordinate_bits
                 m = ham_spec.num_v_numerator_int_bits
-                numerator_frac_bits = n + 1 - m
+                numerator_frac_bits = n + 1 - m + wfr_spec.num_frac_bits
 
                 ex_scope.build_circuit()
 

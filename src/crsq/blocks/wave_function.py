@@ -19,6 +19,7 @@ class WaveFunctionRegisterSpec:
                  num_electrons: int,
                  num_moving_nuclei: int,
                  num_stationary_nuclei: int,
+                 num_frac_bits: int = -1,
                  use_spin = False,
                  i_to_x=None,
                  j_to_y=None,
@@ -26,6 +27,7 @@ class WaveFunctionRegisterSpec:
         """ constructor """
         self._dimension = dimension
         self._num_coordinate_bits = num_coordinate_bits
+        self._num_frac_bits = num_frac_bits
         self._space_length = space_length
         self._num_electrons = num_electrons
         self._num_moving_nuclei = num_moving_nuclei
@@ -48,6 +50,7 @@ class WaveFunctionRegisterSpec:
         logger.info("WaveFunctionRegisterSpec: use_spin = %d", use_spin)
         logger.info("WaveFunctionRegisterSpec: num_orbital_index_bits = %d",
                     self._num_orbital_index_bits)
+        logger.info("WaveFunctionRegisterSpec: num_frac_bits = %d", num_frac_bits)
 
 
     @property
@@ -59,6 +62,11 @@ class WaveFunctionRegisterSpec:
     def num_coordinate_bits(self) -> int:
         """ number of coordinate bits"""
         return self._num_coordinate_bits
+
+    @property
+    def num_frac_bits(self) -> int:
+        """ number of fractional bits"""
+        return self._num_frac_bits
 
     @property
     def space_length(self) -> float:
