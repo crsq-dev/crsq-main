@@ -227,9 +227,9 @@ class ArithElectronPotentialBlock(PotentialBlockBase):
         self._nregs = self._wfr_spec.allocate_nucl_registers()
         self.add_param(("eregs", self._eregs), ("nregs", self._nregs))
         wfr_spec = self._wfr_spec
-        n = wfr_spec.num_coordinate_bits
-        m = self._ham_spec.num_v_numerator_int_bits
-        self._vx_const_numerator_reg = QuantumRegister(n + m, "one")
+        m = self._ham_spec.num_v_numerator_int_bits # always 1
+        f = wfr_spec.num_coordinate_bits + wfr_spec.num_frac_bits
+        self._vx_const_numerator_reg = QuantumRegister(m + f, "one")
         self.add_local(self._vx_const_numerator_reg)
         self._allocate_singularity_exchange_registers()
 
@@ -251,8 +251,8 @@ class ArithElectronPotentialBlock(PotentialBlockBase):
         wfr_spec = self._wfr_spec
         ham_spec = self._ham_spec
         n = wfr_spec.num_coordinate_bits
-        m = ham_spec.num_v_numerator_int_bits
-        numerator_frac_bits = n + 1 - m
+
+        numerator_frac_bits = wfr_spec.num_coordinate_bits + wfr_spec.num_frac_bits
         numerator_val = int(1.0 * (2**numerator_frac_bits))
         qc = self.circuit
         ari.set_value(qc, self._vx_const_numerator_reg, numerator_val)
@@ -312,7 +312,7 @@ class ArithElectronPotentialBlock(PotentialBlockBase):
 
         n = wfr_spec.num_coordinate_bits
         m = ham_spec.num_v_numerator_int_bits
-        numerator_frac_bits = n + 1 - m
+        numerator_frac_bits = n + 1 - m + wfr_spec.num_frac_bits
         numerator_val = int(1.0 * (2**numerator_frac_bits))
         qc = self.circuit
         ari.set_value(qc, self._vx_const_numerator_reg, numerator_val)
@@ -410,8 +410,7 @@ class ArithElectronPotentialBlock(PotentialBlockBase):
 
                 in_scope = ast.new_scope(self)
                 n = wfr_spec.num_coordinate_bits
-                m = ham_spec.num_v_numerator_int_bits # always 1
-                numerator_frac_bits = n + 1 - m + wfr_spec.num_frac_bits
+                numerator_frac_bits = n + wfr_spec.num_frac_bits
 
                 ex_scope.build_circuit()
 
@@ -441,7 +440,14 @@ class ArithElectronPotentialBlock(PotentialBlockBase):
                     if should_mask_singularity:
                         self._build_set_diff0_reg(iast_diff.register)
                         self._build_stash_quotient_on_diff0(iast_quotient.register)
-                    self._rotate_phase_by_ast(iast_quotient, qq)
+                    if wfr_spec.dimension == 1:
+                        self._rotate_phase_by_ast(iast_quotient, qq)
+                    else:
+                        new_integer_bits = 1 # 1/r <= 1.0
+                        new_fraction_bits = wfr_spec.num_coordinate_bits
+                        new_total_bits = new_integer_bits + new_fraction_bits
+                        iast_quotient_truncated = iast_quotient.adjust_precision(new_total_bits, new_fraction_bits)
+                        self._rotate_phase_by_ast(iast_quotient_truncated, qq)
                 if ham_spec.should_revert_potential_ancilla_value:
                     # restore the hidden 1/r
                     if should_mask_singularity:
@@ -583,8 +589,7 @@ class ArithElectronPotentialBlock(PotentialBlockBase):
 
                 in_scope = ast.new_scope(self)
                 n = wfr_spec.num_coordinate_bits
-                m = ham_spec.num_v_numerator_int_bits
-                numerator_frac_bits = n + 1 - m + wfr_spec.num_frac_bits
+                numerator_frac_bits = n + wfr_spec.num_frac_bits
 
                 ex_scope.build_circuit()
 
@@ -616,7 +621,14 @@ class ArithElectronPotentialBlock(PotentialBlockBase):
                     if should_mask_singularity:
                         self._build_set_diff0_reg(iast_dist.register)
                         self._build_stash_quotient_on_diff0(iast_quotient.register)
-                    self._rotate_phase_by_ast(iast_quotient, qq)
+                    if wfr_spec.dimension == 1:
+                        self._rotate_phase_by_ast(iast_quotient, qq)
+                    else:
+                        new_integer_bits = 1 # 1/r <= 1.0
+                        new_fraction_bits = wfr_spec.num_coordinate_bits
+                        new_total_bits = new_integer_bits + new_fraction_bits
+                        iast_quotient_truncated = iast_quotient.adjust_precision(new_total_bits, new_fraction_bits)
+                        self._rotate_phase_by_ast(iast_quotient_truncated, qq)
                 if ham_spec.should_revert_potential_ancilla_value:
                     # restore the hidden 1/r
                     if should_mask_singularity:
