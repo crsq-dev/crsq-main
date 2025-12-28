@@ -226,11 +226,11 @@ class ArithElectronPotentialBlock(PotentialBlockBase):
         self._eregs = self._wfr_spec.allocate_elec_registers()
         self._nregs = self._wfr_spec.allocate_nucl_registers()
         self.add_param(("eregs", self._eregs), ("nregs", self._nregs))
-        wfr_spec = self._wfr_spec
-        m = self._ham_spec.num_v_numerator_int_bits # always 1
-        f = wfr_spec.num_coordinate_bits + wfr_spec.num_frac_bits
-        self._vx_const_numerator_reg = QuantumRegister(m + f, "one")
-        self.add_local(self._vx_const_numerator_reg)
+        # wfr_spec = self._wfr_spec
+        # m = self._ham_spec.num_v_numerator_int_bits # always 1
+        # f = wfr_spec.num_coordinate_bits + wfr_spec.num_frac_bits
+        # self._vx_const_numerator_reg = QuantumRegister(m + f, "one")
+        # self.add_local(self._vx_const_numerator_reg)
         self._allocate_singularity_exchange_registers()
 
 
@@ -249,13 +249,13 @@ class ArithElectronPotentialBlock(PotentialBlockBase):
         ext_scope = ast.new_scope(self)
 
         wfr_spec = self._wfr_spec
-        ham_spec = self._ham_spec
+        # ham_spec = self._ham_spec
         n = wfr_spec.num_coordinate_bits
 
-        numerator_frac_bits = wfr_spec.num_coordinate_bits + wfr_spec.num_frac_bits
-        numerator_val = int(1.0 * (2**numerator_frac_bits))
-        qc = self.circuit
-        ari.set_value(qc, self._vx_const_numerator_reg, numerator_val)
+        # numerator_frac_bits = wfr_spec.num_coordinate_bits + wfr_spec.num_frac_bits
+        # numerator_val = int(1.0 * (2**numerator_frac_bits))
+        # qc = self.circuit
+        # ari.set_value(qc, self._vx_const_numerator_reg, numerator_val)
 
         dim = wfr_spec.dimension
 
@@ -299,8 +299,8 @@ class ArithElectronPotentialBlock(PotentialBlockBase):
         ext_scope.close()
 
         # reset constant values
-        if ham_spec.should_revert_potential_ancilla_value:
-            ari.set_value(self.circuit, self._vx_const_numerator_reg, numerator_val)
+        # if ham_spec.should_revert_potential_ancilla_value:
+        #     ari.set_value(self.circuit, self._vx_const_numerator_reg, numerator_val)
 
     def build_circuits_original(self):
         """build circuits
@@ -575,27 +575,37 @@ class ArithElectronPotentialBlock(PotentialBlockBase):
                         ast_squares.append(ast_sq)
                         if d > 0:
                             ast_squares[0] += ast_squares[d]  # sum
-                        if wfr_spec.num_frac_bits > 0:
-                            # add bits for fraction part
-                            num_sq_frac_bits = wfr_spec.num_frac_bits * 2  # for squared vaules
-                            frac_qubits = self.allocate_ancilla_bits(num_sq_frac_bits, f"frac")
-                            old_total_bits = ast_squares[0].total_bits
-                            square_with_frac = ast_squares[0].adjust_precision(
-                                old_total_bits + num_sq_frac_bits, num_sq_frac_bits, new_low_bits=frac_qubits
-                            )
-                        else:
-                            square_with_frac = ast_squares[0]
+                    if wfr_spec.num_frac_bits > 0:
+                        # add bits for fraction part
+                        num_sq_frac_bits = wfr_spec.num_frac_bits * 2  # for squared vaules
+                        frac_qubits = self.allocate_ancilla_bits(num_sq_frac_bits, f"frac")
+                        old_total_bits = ast_squares[0].total_bits
+                        square_with_frac = ast_squares[0].adjust_precision(
+                            old_total_bits + num_sq_frac_bits, num_sq_frac_bits, new_low_bits=frac_qubits
+                        )
+                    else:
+                        square_with_frac = ast_squares[0]
                     ast_dist = ex_scope.square_root(square_with_frac)
 
+                # allocate inner scope for division and rotation.
+                # this will allow using bits from the temporary pool to hold the quotient value.
                 in_scope = ast.new_scope(self)
                 n = wfr_spec.num_coordinate_bits
                 numerator_frac_bits = n + wfr_spec.num_frac_bits
 
                 ex_scope.build_circuit()
 
-                iast_numerator = in_scope.register(
-                    self._vx_const_numerator_reg, numerator_frac_bits
-                )
+                # prepare numerator
+                num_nm_int_bits = ham_spec.num_v_numerator_int_bits
+                num_nm_frac_bits = wfr_spec.num_coordinate_bits + wfr_spec.num_frac_bits
+                nm_reg = in_scope.allocate_temp_register(num_nm_int_bits + num_nm_frac_bits, "one")
+                numerator_val = int(1.0 * (2**num_nm_frac_bits))
+                ari.set_value(in_scope.circuit, nm_reg, numerator_val)
+                iast_numerator = in_scope.register(nm_reg, numerator_frac_bits)
+
+                # iast_numerator = in_scope.register(
+                #     self._vx_const_numerator_reg, numerator_frac_bits
+                # )
                 iast_dist = in_scope.register(ast_dist.register, ast_dist.fraction_bits)
 
                 if iast_dist.total_bits < iast_numerator.total_bits:
@@ -638,6 +648,9 @@ class ArithElectronPotentialBlock(PotentialBlockBase):
                         self._build_set_diff0_reg(iast_dist.register)
                     in_scope.build_inverse_circuit()
                     in_scope.clear_operations()
+                    if ham_spec.should_revert_potential_ancilla_value:
+                        ari.set_value(in_scope.circuit, nm_reg, numerator_val)
+                    in_scope.free_temp_register(nm_reg)
                     ex_scope.build_inverse_circuit()
                 ex_scope.clear_operations()
                 if pad_denominator:
