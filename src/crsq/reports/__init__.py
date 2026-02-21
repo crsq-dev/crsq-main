@@ -3,3 +3,4 @@
 
 from .h1d1report import H1D1Report
 from .h1d2report import H1D2Report
+from .h1d3report import H1D3Report

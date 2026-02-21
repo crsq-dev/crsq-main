@@ -1,4 +1,4 @@
-"""Report generator for 1 H atom, 2 dimension
+"""Report generator for 1 H atom, 3 dimension
 This module takes numpy data types.
 """
 
@@ -28,128 +28,12 @@ import logging
 
 logger = logging.getLogger("crsq.reports")
 
+class H1D3Report:
+    """Report generator for 1 H atom, 3 dimension
+       Draw a slice of the data at z = 0.
 
-class H1D2ShowPsi:
-    def __init__(
-        self,
-        frames_dir: str,
-        num_coordinate_bits: int,
-        zmin: float,
-        zmax: float,
-        vmin: float,
-        vmax: float,
-        kzmin: float,
-        kzmax: float,
-        kvmin: float,
-        kvmax: float,
-        space_length: float,
-        colormap_name: str = "cmr.guppy",
-    ):
-        self._frames_dir = frames_dir
-        self._n1 = num_coordinate_bits
-        self._M = 1 << self._n1
-        M = self._M
-        self._L = space_length
-        self._dq = space_length / (1 << num_coordinate_bits)
-        self._zmin = zmin
-        self._zmax = zmax
-        self._vmin = vmin
-        self._vmax = vmax
-        self._kzmin = kzmin
-        self._kzmax = kzmax
-        self._kvmin = kvmin
-        self._kvmax = kvmax
-        self._colormap_name = colormap_name
-        self._signed = True
-        # x,y and qx,qy values
-        if self._signed:
-            iq = numpy.mod(numpy.linspace(-M // 2, M // 2 - 1, M), M) - M // 2
-            self._yq, self._xq = numpy.meshgrid(iq, iq)
-        else:
-            self._yq, self._xq = numpy.meshgrid(numpy.arange(M), numpy.arange(M))
-        dq = self._dq
-        self._y = self._yq * dq
-        self._x = self._xq * dq
-
-    def _shift_p_data(
-        self, p_data: npt.NDArray[numpy.complex128]
-    ) -> npt.NDArray[numpy.complex128]:
-        """shift p_data by (M/2, M/2) using modulo M"""
-        M = self._M
-        ind_x, ind_y = numpy.meshgrid(
-            (numpy.arange(M) + M // 2) % M, (numpy.arange(M) + M // 2) % M
-        )
-        return p_data[ind_x, ind_y]
-
-    def swap_hl(
-        self, data: npt.NDArray[numpy.complex128]
-    ) -> npt.NDArray[numpy.complex128]:
-        """swap the left and right halves for i, and upper and lower halves for j of the data[i,j]"""
-        if self._signed:
-            return self._shift_p_data(data)
-        else:
-            return data
-
-    def plot(self, ax: plt.Axes, t: float, title: str) -> None:
-        """plot the wave function"""
-        colormap = plt.get_cmap(self._colormap_name)
-        q_data = self.read_data_sample("q", t)
-        np_qyv = self.swap_hl(self._y)
-        np_qxv = self.swap_hl(self._x)
-        sw_q_data = self.swap_hl(q_data)
-        dq = self._dq
-
-        ax.set_title(title)
-        ax.set_zlim3d(self._zmin, self._zmax)
-        ax.set_xlabel("y")
-        ax.set_ylabel("x")
-        ax.plot_surface(
-            np_qyv,
-            np_qxv,
-            (1 / dq) * numpy.real(sw_q_data),
-            cmap=colormap,
-            vmin=self._vmin,
-            vmax=self._vmax,
-        )
-
-    def read_data_sample(self, label: str, t: float) -> npt.NDArray[numpy.complex128]:
-        """read q-space 2d grid data from a text file"""
-        file_name = f"{self._frames_dir}/{t:06.3f}.{label}.csv"
-        with open(file_name, "r") as f:
-            s = f.readline().split(",")
-            n1 = int(s[0])
-            n2 = int(s[1])
-            data = numpy.zeros((n1, n2), dtype=numpy.complex128)
-            for i in range(n1):
-                for j in range(n2):
-                    s = f.readline().split(",")
-                    data[i, j] = complex(float(s[2]), float(s[3]))
-        return data
-
-
-class H1D2Report:
-    """Report generator for 1 H atom, 2 dimension
-       :param outdir: output directory for the report
-       :param plot_type: type of plot to produce (2d, 3d, 3d-re, 3d-qp, 3d-3, 3d-3qp)
-       :param title: title of the report
-       :param psifunc_label: label for the wave function (e.g. "ψ1s")
-       :param num_coordinate_bits: number of bits for the coordinate (e.g. 8 for 256x256 grid)
-       :param zmin: minimum z value for the plot
-       :param zmax: maximum z value for the plot
-       :param vmin: minimum value for the color map
-       :param vmax: maximum value for the color map
-       :param kzmin: minimum z value for the p-space plot
-       :param kzmax: maximum z value for the p-space plot
-       :param kvmin: minimum value for the color map for the p-space plot
-       :param kvmax: maximum value for the color map for the p-space plot
-       :param space_length: length of the space (e.g. 20.0 for -10.0 to 10.0)
-       :param hp_func: function for the potential energy (e.g. vfunc1 for 1 H atom)
-       :param delta_t: time step for the simulation
-       :param num_elec_iters: number of electronic iterations per nuclear iteration
-       :param num_nucl_iters: number of nuclear iterations
-       :param signed: whether to use signed coordinates (i.e. -M/2 to M/2-1) or unsigned coordinates (0 to M-1)
-       :param colormap_name: name of the colormap to use for plotting (default: "cmr.guppy")    
     """
+
     def __init__(
         self,
         outdir: str,
@@ -167,7 +51,7 @@ class H1D2Report:
         kvmax: float,
         space_length: float,
         hp_func: (
-            Callable[[float, float], float] | Dict[str, Callable[[float, float], float]]
+            Callable[[float, float, float], float]
         ),
         delta_t: float,
         num_elec_iters: int,
@@ -209,34 +93,31 @@ class H1D2Report:
         # x,y and qx,qy values
         if self._signed:
             iq = numpy.mod(numpy.linspace(-M // 2, M // 2 - 1, M), M) - M // 2
-            self._yq, self._xq = numpy.meshgrid(iq, iq)
+            self._xq, self._yq = numpy.meshgrid(iq, iq)
         else:
-            self._yq, self._xq = numpy.meshgrid(numpy.arange(M), numpy.arange(M))
+            self._xq, self._yq  = numpy.meshgrid(numpy.arange(M), numpy.arange(M))
         dq = self._dq
-        self._y = self._yq * dq
         self._x = self._xq * dq
-        # potential energy
-        if isinstance(self._hp_func, dict):
-            self._hp = {
-                key: self._hp_func[key](self._x, self._y)
-                for key in self._hp_func.keys()
-            }
-        else:
-            self._hp = {"Hp": self._hp_func(self._x, self._y)}
+        self._y = self._yq * dq
+        x3 = self._x[:, :, numpy.newaxis]
+        y3 = self._y[:, :, numpy.newaxis]
+        z3 = numpy.zeros_like(x3)
+        # potential energy Hp(x,y,0)
+        self._hp = {"Hp": self._hp_func(x3, y3, z3)}
         # discretized wave number values
 
         kq = numpy.mod(numpy.linspace(-M // 2, M // 2 - 1, M), M) - M // 2
         self._kxq, self._kyq = numpy.meshgrid(kq, kq)
 
         dk = self._dk
-        self._ky = self._kyq * dk
         self._kx = self._kxq * dk
+        self._ky = self._kyq * dk
 
         kq2 = numpy.square(kq)
         self._kxq2, self._kyq2 = numpy.meshgrid(kq2, kq2)
         self._kq2 = self._kxq2 + self._kyq2
 
-        self._k2 = self._kq2 * (dk * dk)
+        self._k2 = self._kq2 * (dk * dk * dk)
         self._hk = self._k2 / 2.0
 
         # make the frames directory
@@ -275,9 +156,10 @@ class H1D2Report:
             self._hp_trace[key] = []
 
     def add_data_sample(
-        self, label: str, t: float, q_data: npt.NDArray[numpy.complex128], q0_data: None | npt.NDArray[numpy.complex128] = None
+        self, label: str, t: float, q_data3: npt.NDArray[numpy.complex128]
     ) -> None:
         """save 2d grid data to a text file"""
+        q_data = q_data3[:, :, self._M // 2]
         file_name = self._frames_dir + f"/{t:06.3f}.{label}.csv"
         print("Saving to : ", file_name)
         self.write_2d_data(file_name, q_data)
@@ -416,10 +298,11 @@ class H1D2Report:
         ax.set_ylabel("x")
         np_qxv = sw_x
         np_qyv = sw_y
+        scale = math.pow(dq, -3/2)
         ax.plot_surface(
             np_qyv,
             np_qxv,
-            (1 / dq) * numpy.abs(sw_q_data),
+            scale * numpy.abs(sw_q_data),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
@@ -449,10 +332,11 @@ class H1D2Report:
         np_qxv = self.swap_hl(self._x)
         np_qyv = self.swap_hl(self._y)
         sw_q_data = self.swap_hl(q_data)
+        scale = math.pow(dq, -3/2)
         ax.plot_surface(
             np_qyv,
             np_qxv,
-            (1 / dq) * numpy.real(sw_q_data),
+            scale * numpy.real(sw_q_data),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
@@ -484,7 +368,7 @@ class H1D2Report:
         ax.plot_surface(
             np_qyv,
             np_qxv,
-            (1 / dq) * numpy.real(sw_q_data),
+            math.pow(dq, -3/2) * numpy.real(sw_q_data),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
@@ -563,7 +447,7 @@ class H1D2Report:
         ax.plot_surface(
             np_qyv,
             np_qxv,
-            (1 / dq) * numpy.abs(sw_q_data),
+            math.pow(dq, -3/2) * numpy.abs(sw_q_data),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
@@ -577,7 +461,7 @@ class H1D2Report:
         ax.plot_surface(
             np_qyv,
             np_qxv,
-            (1 / dq) * numpy.real(sw_q_data),
+            math.pow(dq, -3/2) * numpy.real(sw_q_data),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
@@ -591,7 +475,7 @@ class H1D2Report:
         ax.plot_surface(
             np_qyv,
             np_qxv,
-            (1 / dq) * numpy.imag(sw_q_data),
+            math.pow(dq, -3/2) * numpy.imag(sw_q_data),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
@@ -615,7 +499,7 @@ class H1D2Report:
         ax.plot_surface(
             np_ky,
             np_kx,
-            (1 / dk) * numpy.abs(shifted_p_data),
+            math.pow(dk, -3/2) * numpy.abs(shifted_p_data),
             cmap=colormap,
             vmin=self._kvmin,
             vmax=self._kvmax,
@@ -629,7 +513,7 @@ class H1D2Report:
         ax.plot_surface(
             np_ky,
             np_kx,
-            (1 / dk) * numpy.real(shifted_p_data),
+            math.pow(dk, -3/2) * numpy.real(shifted_p_data),
             cmap=colormap,
             vmin=self._kvmin,
             vmax=self._kvmax,
@@ -643,7 +527,7 @@ class H1D2Report:
         ax.plot_surface(
             np_ky,
             np_kx,
-            (1 / dk) * numpy.imag(shifted_p_data),
+            math.pow(dk, -3/2) * numpy.imag(shifted_p_data),
             cmap=colormap,
             vmin=self._kvmin,
             vmax=self._kvmax,
