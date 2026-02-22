@@ -159,7 +159,7 @@ class H1D3Report:
         self, label: str, t: float, q_data3: npt.NDArray[numpy.complex128]
     ) -> None:
         """save 2d grid data to a text file"""
-        q_data = q_data3[:, :, self._M // 2]
+        q_data = q_data3[:, :, 0] # signed.
         file_name = self._frames_dir + f"/{t:06.3f}.{label}.csv"
         print("Saving to : ", file_name)
         self.write_2d_data(file_name, q_data)
@@ -385,7 +385,7 @@ class H1D3Report:
         ax.plot_surface(
             np_ky,
             np_kx,
-            (1 / dk) * numpy.real(shifted_p_data),
+            math.pow(dk, -3/2) * numpy.real(shifted_p_data),
             cmap=colormap,
             vmin=self._kvmin,
             vmax=self._kvmax,

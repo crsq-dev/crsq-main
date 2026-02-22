@@ -53,6 +53,7 @@ class PsiH3D:
         phi = numpy.arctan2(dyv, dxv)
         Y = sp.sph_harm(self._m, self._l, phi, theta)
         psi = R * Y
+        logger.info("PsiH3D: psi(0,0,0) = %e", psi[0, 0, 0])
         return psi
 
     @property
