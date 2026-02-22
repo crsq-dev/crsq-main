@@ -20,6 +20,7 @@ class PsiH3D:
             m: int : magnetic quantum number
     """
     def __init__(self, Qx0: float, Qy0: float, Qz0: float, n: int, l: int, m: int):
+        logger.info("PsiH3D.__init__: Qx0=%f, Qy0=%f, Qz0=%f, n=%d, l=%d, m=%d", Qx0, Qy0, Qz0, n, l, m)
         self._Qx0 = Qx0
         self._Qy0 = Qy0
         self._Qz0 = Qz0
@@ -40,21 +41,36 @@ class PsiH3D:
             psi: numpy.ndarray[(M,M)] : wave function values
         """
         logger.info("PsiH3D.__call__")
-        dxv = qxv - self._Qx0
-        dyv = qyv - self._Qy0
-        dzv = qzv - self._Qz0
+        # radial part
+        R = self.R(qxv, qyv, qzv)
+        # angular part
+        Y = self.Y(qxv, qyv, qzv)
+        psi = R * Y
+        logger.info("PsiH3D: psi(0,0,0) = %e", psi[0, 0, 0])
+        return psi
+
+    def R(self, x, y, z):
+        """ calculate the radial part of the wave function of the hydrogen atom in 3D model."""
+        dxv = x - self._Qx0
+        dyv = y - self._Qy0
+        dzv = z - self._Qz0
         rv = numpy.sqrt(dxv * dxv + dyv * dyv + dzv * dzv)
         # radial part
         rho = 2 * rv / (self._n * self._a0)
         L = sp.genlaguerre(self._n - self._l - 1, 2 * self._l + 1)(rho)
         R = self._scale * numpy.exp(-rho / 2) * rho ** self._l * L
-        # angular part
+        return R
+
+    def Y(self, x, y, z):
+        """ calculate the angular part of the wave function of the hydrogen atom in 3D model."""
+        dxv = x - self._Qx0
+        dyv = y - self._Qy0
+        dzv = z - self._Qz0
+        rv = numpy.sqrt(dxv * dxv + dyv * dyv + dzv * dzv)
         theta = numpy.arccos(dzv / rv)
         phi = numpy.arctan2(dyv, dxv)
         Y = sp.sph_harm(self._m, self._l, phi, theta)
-        psi = R * Y
-        logger.info("PsiH3D: psi(0,0,0) = %e", psi[0, 0, 0])
-        return psi
+        return Y
 
     @property
     def label(self):
