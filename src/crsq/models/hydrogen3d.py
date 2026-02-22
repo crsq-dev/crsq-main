@@ -30,7 +30,7 @@ class PsiH3D:
         self._m = m
         self._scale = numpy.sqrt((2 / n) ** 3 * math.factorial(n - l - 1) / (2 * n * math.factorial(n + l)))
 
-    def __call__(self, qxv: numpy.ndarray, qyv: numpy.ndarray, qzv: numpy.ndarray) -> numpy.ndarray:
+    def __call__(self, x: numpy.ndarray, y: numpy.ndarray, z: numpy.ndarray) -> numpy.ndarray:
         """ calculate the wave function of the hydrogen atom in 3D model.
 
         Args:
@@ -41,12 +41,19 @@ class PsiH3D:
             psi: numpy.ndarray[(M,M)] : wave function values
         """
         logger.info("PsiH3D.__call__")
+        dxv = x - self._Qx0
+        dyv = y - self._Qy0
+        dzv = z - self._Qz0
+        rv = numpy.sqrt(dxv * dxv + dyv * dyv + dzv * dzv)
         # radial part
-        R = self.R(qxv, qyv, qzv)
+        rho = 2 * rv / (self._n * self._a0)
+        L = sp.genlaguerre(self._n - self._l - 1, 2 * self._l + 1)(rho)
+        R = self._scale * numpy.exp(-rho / 2) * rho ** self._l * L
         # angular part
-        Y = self.Y(qxv, qyv, qzv)
+        theta = numpy.arccos(dzv / rv)
+        phi = numpy.arctan2(dyv, dxv)
+        Y = sp.sph_harm(self._m, self._l, phi, theta)
         psi = R * Y
-        logger.info("PsiH3D: psi(0,0,0) = %e", psi[0, 0, 0])
         return psi
 
     def R(self, x, y, z):
