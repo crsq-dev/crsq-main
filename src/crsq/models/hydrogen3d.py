@@ -3,6 +3,7 @@
 """
 import math
 import numpy
+import numpy.typing as npt
 import scipy.special as sp
 import logging
 
@@ -30,7 +31,7 @@ class PsiH3D:
         self._m = m
         self._scale = numpy.sqrt((2 / n) ** 3 * math.factorial(n - l - 1) / (2 * n * math.factorial(n + l)))
 
-    def __call__(self, x: numpy.ndarray, y: numpy.ndarray, z: numpy.ndarray) -> numpy.ndarray:
+    def __call__(self, x: npt.NDArray[numpy.float64], y: npt.NDArray[numpy.float64], z: npt.NDArray[numpy.float64]) -> npt.NDArray[numpy.float64]:
         """ calculate the wave function of the hydrogen atom in 3D model.
 
         Args:
@@ -160,7 +161,6 @@ class VHAtom3:
         QA = self._Z
         varray = (qe * QA) / riA
         return varray
-
 
     @property
     def label(self):
