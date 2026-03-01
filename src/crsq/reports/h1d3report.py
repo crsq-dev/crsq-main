@@ -103,7 +103,13 @@ class H1D3Report:
         y3 = self._y[:, :, numpy.newaxis]
         z3 = numpy.zeros_like(x3)
         # potential energy Hp(x,y,0)
-        self._hp = {"Hp": self._hp_func(x3, y3, z3)}
+        if isinstance(self._hp_func, dict):
+            self._hp = {
+                key: self._hp_func[key](x3, y3, z3)
+                for key in self._hp_func.keys()
+            }
+        else:
+            self._hp = {"Hp": self._hp_func(x3, y3, z3)}
         # discretized wave number values
 
         kq = numpy.mod(numpy.linspace(-M // 2, M // 2 - 1, M), M) - M // 2
@@ -158,7 +164,7 @@ class H1D3Report:
     def add_data_sample(
         self, label: str, t: float, q_data3: npt.NDArray[numpy.complex128]
     ) -> None:
-        """save 2d grid data to a text file"""
+        """save 3d grid data to a text file"""
         q_data = q_data3[:, :, 0] # signed.
         file_name = self._frames_dir + f"/{t:06.3f}.{label}.csv"
         print("Saving to : ", file_name)
@@ -537,12 +543,12 @@ class H1D3Report:
         logger.info("Recording energy at t=%f", t)
         self._trace_time.append(t)
 
-        Hk = numpy.sum(numpy.abs(p_data * numpy.conjugate(p_data)) * self._hk).item()
+        Hk = numpy.sum(numpy.abs(p_data)**2 * self._hk).item()
         self._hk_trace.append(Hk)
 
         for key in self._hp.keys():
             hpf = self._hp[key]
-            Hp = numpy.sum(numpy.abs(q_data * numpy.conjugate(q_data)) * hpf).item()
+            Hp = numpy.sum(numpy.abs(q_data)**2 * hpf).item()
             Htot = Hk + Hp
             self._hp_trace[key].append(Hp)
             logger.info("t=%f, Hk=%f, %s=%f, Hk+%s=%f", t, Hk, key, Hp, key, Htot)

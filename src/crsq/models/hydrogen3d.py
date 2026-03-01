@@ -16,9 +16,9 @@ class PsiH3D:
 
         Args:
             (Qx0, Qy0, Qz0): float : center of the potential
-            n: int : primary quantum number
-            l: int : azimuthal quantum number
-            m: int : magnetic quantum number
+            n: int : primary quantum number (1, 2, 3, ...)
+            l: int : azimuthal quantum number (0, 1, 2, ..., n-1)
+            m: int : magnetic quantum number (-l, -l+1, ..., l-1, l)
     """
     def __init__(self, Qx0: float, Qy0: float, Qz0: float, n: int, l: int, m: int):
         logger.info("PsiH3D.__init__: Qx0=%f, Qy0=%f, Qz0=%f, n=%d, l=%d, m=%d", Qx0, Qy0, Qz0, n, l, m)
@@ -29,7 +29,7 @@ class PsiH3D:
         self._n = n
         self._l = l
         self._m = m
-        self._scale = numpy.sqrt((2 / n) ** 3 * math.factorial(n - l - 1) / (2 * n * math.factorial(n + l)))
+        self._scale = numpy.sqrt((2 / (n*self._a0)) ** 3 * math.factorial(n - l - 1) / (2 * n * math.factorial(n + l)))
 
     def __call__(self, x: npt.NDArray[numpy.float64], y: npt.NDArray[numpy.float64], z: npt.NDArray[numpy.float64]) -> npt.NDArray[numpy.float64]:
         """ calculate the wave function of the hydrogen atom in 3D model.
@@ -46,12 +46,12 @@ class PsiH3D:
         dyv = y - self._Qy0
         dzv = z - self._Qz0
         rv = numpy.sqrt(dxv * dxv + dyv * dyv + dzv * dzv)
-        # radial part
+        # radial part R(r)
         rho = 2 * rv / (self._n * self._a0)
-        L = sp.genlaguerre(self._n - self._l - 1, 2 * self._l + 1)(rho)
+        L = sp.assoc_laguerre(rho, self._n - self._l - 1, 2 * self._l + 1)
         R = self._scale * numpy.exp(-rho / 2) * rho ** self._l * L
-        # angular part
-        theta = numpy.arccos(dzv / rv)
+        # angular part Y(θ,φ)
+        theta = numpy.arccos(numpy.where(rv == 0, 1.0, dzv / rv))
         phi = numpy.arctan2(dyv, dxv)
         Y = sp.sph_harm(self._m, self._l, phi, theta)
         psi = R * Y
@@ -75,7 +75,7 @@ class PsiH3D:
         dyv = y - self._Qy0
         dzv = z - self._Qz0
         rv = numpy.sqrt(dxv * dxv + dyv * dyv + dzv * dzv)
-        theta = numpy.arccos(dzv / rv)
+        theta = numpy.arccos(numpy.where(rv == 0, 1.0, dzv / rv))
         phi = numpy.arctan2(dyv, dxv)
         Y = sp.sph_harm(self._m, self._l, phi, theta)
         return Y
@@ -119,9 +119,9 @@ class VHAtom3:
         arguments:
             Qx0, Qy0, Qz0: float : center of the potential
             dq: float : offset added to avoid division by zero
-            r0: float : Δ1 for Ha1 potential function (Ha1(r)=1/Δ1 for r = 0, 1/r for r > 0) for r0lim pole mitigation
+            reff: float : r_eff for Ha1 potential function (Ha1(r)=1/r_eff for r = 0, 1/r for r > 0) for r0lim pole mitigation
             Z: float : charge of the nucleus
-            eps: float : Δ1 for Ha2 potential function (Ha2(r)=1/sqrt(r^2+Δ1^2) for rofs pole mitigation
+            eps: float : r_eff for Ha2 potential function (Ha2(r)=1/sqrt(r^2+r_eff^2) for rofs pole mitigation
         """
         self._Qx0 = Qx0
         self._Qy0 = Qy0
@@ -143,7 +143,7 @@ class VHAtom3:
 
         if self._frac_bits <= 0:
             riA = numpy.sqrt(
-                (numpy.square(x - self._Qx0) + numpy.square(y - self._Qy0) + numpy.square(z - self._Qz0))
+                ((x - self._Qx0) ** 2 + (y - self._Qy0) ** 2 + (z - self._Qz0) ** 2)
             )
         else:
             # emulate fixed point calculation with frac_bits
@@ -156,10 +156,10 @@ class VHAtom3:
             riA = self._dq * numpy.floor(numpy.sqrt(rsqq * scale)) / hscale
 
         riA[xq0, yq0, zq0] = self._reff
-        logger.info("VHAtom3.Hp0 = %f", 1 / self._reff)
         qe = -1
         QA = self._Z
         varray = (qe * QA) / riA
+        logger.info("VHAtom3.Hp0 = %f", varray[xq0, yq0, zq0])
         return varray
 
     @property
