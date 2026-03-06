@@ -51,7 +51,7 @@ class H1D3Report:
         kvmax: float,
         space_length: float,
         hp_func: (
-            Callable[[float, float, float], float]
+            Callable[[float, float, float], float] | Dict[str, Callable[[float, float, float], float]]
         ),
         delta_t: float,
         num_elec_iters: int,
@@ -96,35 +96,50 @@ class H1D3Report:
             self._xq, self._yq = numpy.meshgrid(iq, iq)
         else:
             self._xq, self._yq  = numpy.meshgrid(numpy.arange(M), numpy.arange(M))
+
         dq = self._dq
         self._x = self._xq * dq
         self._y = self._yq * dq
-        x3 = self._x[:, :, numpy.newaxis]
-        y3 = self._y[:, :, numpy.newaxis]
-        z3 = numpy.zeros_like(x3)
+
+        q3x = iq[:, None, None]*dq
+        q3y = iq[None, :, None]*dq
+        q3z = iq[None, None, :]*dq
         # potential energy Hp(x,y,0)
         if isinstance(self._hp_func, dict):
             self._hp = {
-                key: self._hp_func[key](x3, y3, z3)
+                key: self._hp_func[key](q3x, q3y, q3z)
                 for key in self._hp_func.keys()
             }
         else:
-            self._hp = {"Hp": self._hp_func(x3, y3, z3)}
+            self._hp = {"Hp": self._hp_func(q3x, q3y, q3z)}
         # discretized wave number values
 
         kq = numpy.mod(numpy.linspace(-M // 2, M // 2 - 1, M), M) - M // 2
-        self._kxq, self._kyq = numpy.meshgrid(kq, kq)
+        kq2 = numpy.square(kq)
+        self._kxq = kq[:, None]
+        self._kyq = kq[None, :]
 
         dk = self._dk
-        self._kx = self._kxq * dk
-        self._ky = self._kyq * dk
+        self._kx = self._kxq* dk
+        self._ky = self._kyq* dk
 
-        kq2 = numpy.square(kq)
-        self._kxq2, self._kyq2 = numpy.meshgrid(kq2, kq2)
+        self._kxq2 = kq2[:, None]
+        self._kyq2 = kq2[None, :]
         self._kq2 = self._kxq2 + self._kyq2
 
-        self._k2 = self._kq2 * (dk * dk * dk)
-        self._hk = self._k2 / 2.0
+        self._k3xq = kq[:, None, None]
+        self._k3yq = kq[None, :, None]
+        self._k3zq = kq[None, None, :]
+        self._k3x = self._k3xq * dk
+        self._k3y = self._k3yq * dk
+        self._k3z = self._k3zq * dk
+        self._k3xq2 = kq2[:, None, None]
+        self._k3yq2 = kq2[None, :, None]
+        self._k3zq2 = kq2[None, None, :]
+        self._k3q2 = self._k3xq2 + self._k3yq2 + self._k3zq2
+
+        self._k32 = self._k3q2 * (dk * dk)
+        self._hk3 = self._k32 / 2.0
 
         # make the frames directory
         self._prepare_dir(clean=False)
@@ -165,15 +180,14 @@ class H1D3Report:
         self, label: str, t: float, q_data3: npt.NDArray[numpy.complex128]
     ) -> None:
         """save 3d grid data to a text file"""
-        q_data = q_data3[:, :, 0] # signed.
         file_name = self._frames_dir + f"/{t:06.3f}.{label}.csv"
         print("Saving to : ", file_name)
-        self.write_2d_data(file_name, q_data)
+        self.write_3d_data(file_name, q_data3)
 
-    def write_2d_data(
+    def write_3d_data(
         self, file_name: str, data: npt.NDArray[numpy.complex128]
     ) -> None:
-        """save 2d grid data to a text file"""
+        """save 3d grid data to a text file"""
         if os.path.exists(file_name):
             logger.info("removing old file : %s", file_name)
             os.remove(file_name)
@@ -184,85 +198,91 @@ class H1D3Report:
         logger.info("sum of |ψ|^2 : %f", sumdata)
         logger.info("max of |ψ| : %f", maxdata)
         with open(file_name, "w") as f:
-            f.write(f"{shp[0]},{shp[1]}\n")
+            f.write(f"{shp[0]},{shp[1]},{shp[2]}\n")
             for i in range(shp[0]):
                 for j in range(shp[1]):
-                    f.write(f"{i},{j},{data[i,j].real},{data[i,j].imag}\n")
+                    for k in range(shp[2]):
+                        f.write(f"{i},{j},{k},{data[i,j,k].real},{data[i,j,k].imag}\n")
 
-    def read_2d_data(self, file_name: str) -> npt.NDArray[numpy.complex128]:
-        """read 2d grid data from a text file"""
+    def read_3d_data(self, file_name: str) -> npt.NDArray[numpy.complex128]:
+        """read 3d grid data from a text file"""
         with open(file_name, "r") as f:
             s = f.readline().split(",")
             n1 = int(s[0])
             n2 = int(s[1])
-            data = numpy.zeros((n1, n2), dtype=numpy.complex128)
+            n3 = int(s[2])
+            data = numpy.zeros((n1, n2, n3), dtype=numpy.complex128)
             for i in range(n1):
                 for j in range(n2):
-                    s = f.readline().split(",")
-                    data[i, j] = complex(float(s[2]), float(s[3]))
+                    for k in range(n3):
+                        s = f.readline().split(",")
+                        data[i, j, k] = complex(float(s[3]), float(s[4]))
         return data
 
     def read_data_sample(self, label: str, t: float) -> npt.NDArray[numpy.complex128]:
-        """read q-space 2d grid data from a text file"""
+        """read q-space 3d grid data from a text file"""
         file_name = self._frames_dir + f"/{t:06.3f}.{label}.csv"
-        return self.read_2d_data(file_name)
+        return self.read_3d_data(file_name)
 
     def produce_frame(
         self,
         t: float,
-        q_data: npt.NDArray[numpy.complex128],
-        p_data: npt.NDArray[numpy.complex128],
+        q_data3: npt.NDArray[numpy.complex128],
+        p_data3: npt.NDArray[numpy.complex128],
     ) -> None:
         """ """
+        q_data2 = q_data3[:, :, 0]
+        p_data2 = p_data3[:, :, 0]
         logger.info("Producing frame for t=%f", t)
-        p_data_shifted = self._shift_p_data(p_data)
+        p_data2_shifted = self.swap_hl_ij(p_data2)
         if self._plot_type == "none":
             return
         if self._plot_type == "2d":
-            self.produce_frame2d(t, q_data, p_data_shifted)
+            self.produce_frame2d(t, q_data2, p_data2_shifted)
         elif self._plot_type == "3d":
-            self.produce_frame3d(t, q_data)
+            self.produce_frame3d(t, q_data2)
         elif self._plot_type == "3d-re":
-            self.produce_frame3d_re(t, q_data)
+            self.produce_frame3d_re(t, q_data2)
         elif self._plot_type == "3d-qp":
-            self.produce_frame3d_qp(t, q_data, p_data_shifted)
+            self.produce_frame3d_qp(t, q_data2, p_data2_shifted)
         elif self._plot_type == "3d-3":
-            self.produce_frame3d3(t, q_data)
+            self.produce_frame3d3(t, q_data2)
         elif self._plot_type == "3d-3qp":
-            self.produce_frame3d3qp(t, q_data, p_data_shifted)
+            self.produce_frame3d3qp(t, q_data2, p_data2_shifted)
         else:
             raise ValueError(f"Unknown plot type : {self._plot_type}")
 
-    def _shift_p_data(
-        self, p_data: npt.NDArray[numpy.complex128]
-    ) -> npt.NDArray[numpy.complex128]:
-        """shift p_data by (M/2, M/2) using modulo M"""
+    def swap_hl_ij(self, a_ij):
+        """shift signed index iq by M/2 using modulo M"""
         M = self._M
-        ind_x, ind_y = numpy.meshgrid(
-            (numpy.arange(M) + M // 2) % M, (numpy.arange(M) + M // 2) % M
-        )
-        return p_data[ind_x, ind_y]
+        ar = numpy.roll(a_ij, (M//2, M//2), axis=(0,1))
+        return ar
 
-    def swap_hl(
-        self, data: npt.NDArray[numpy.complex128]
-    ) -> npt.NDArray[numpy.complex128]:
-        """swap the left and right halves for i, and upper and lower halves for j of the data[i,j]"""
-        if self._signed:
-            return self._shift_p_data(data)
-        else:
-            return data
+    def swap_hl_i(self, a_i):
+        """shift signed index iq by M/2 using modulo M"""
+        M = self._M
+        ari = numpy.roll(a_i, M//2, axis=0)
+        # ind_i = iq[:,None]
+        return ari
+
+    def swap_hl_j(self, a_j):
+        """shift signed index iq by M/2 using modulo M"""
+        M = self._M
+        arj = numpy.roll(a_j, M//2, axis=1)
+        # ind_j = iq[None,:]
+        return arj
 
     def produce_frame2d(
         self,
         t: float,
-        q_data: npt.NDArray[numpy.complex128],
-        p_data: npt.NDArray[numpy.complex128],
+        q_data2: npt.NDArray[numpy.complex128],
+        p_data2: npt.NDArray[numpy.complex128],
     ) -> None:
         fig, axs = plt.subplots(1, 2, figsize=(8, 4))
         colormap = plt.get_cmap(self._colormap_name)
         ax: plt.Axes = axs[0]
         # ax.imshow(numpy.abs(self._psi1q))
-        sw_q_data = self.swap_hl(q_data)
+        sw_q_data = self.swap_hl_ij(q_data2)
         ax.imshow(
             numpy.real(sw_q_data),
             cmap=colormap,
@@ -275,7 +295,7 @@ class H1D3Report:
         ax.set_ylabel("yq")
         px: plt.Axes = axs[1]
         px.imshow(
-            numpy.abs(p_data),
+            numpy.abs(p_data2),
             cmap=colormap,
             vmin=self._kvmin,
             vmax=self._kvmax,
@@ -288,15 +308,15 @@ class H1D3Report:
         fig.savefig(filename)
         plt.close(fig)
 
-    def produce_frame3d(self, t, q_data: npt.NDArray[numpy.complex128]) -> None:
+    def produce_frame3d(self, t, q_data2: npt.NDArray[numpy.complex128]) -> None:
         fig, ax = plt.subplots(
             subplot_kw={"projection": "3d"}, figsize=(6, 5.5), layout="constrained"
         )
         colormap = plt.get_cmap(self._colormap_name)
         dq = self._dq
-        sw_x = self.swap_hl(self._x)
-        sw_y = self.swap_hl(self._y)
-        sw_q_data = self.swap_hl(q_data)
+        sw_x = self.swap_hl_j(self._x)
+        sw_y = self.swap_hl_i(self._y)
+        sw_q_data2 = self.swap_hl_ij(q_data2)
 
         ax.set_title("|ψ|")
         ax.set_zlim3d(self._zmin, self._zmax)
@@ -308,7 +328,7 @@ class H1D3Report:
         ax.plot_surface(
             np_qyv,
             np_qxv,
-            scale * numpy.abs(sw_q_data),
+            scale * numpy.abs(sw_q_data2),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
@@ -322,7 +342,7 @@ class H1D3Report:
         plt.close(fig)
 
     def produce_frame3d_re(
-        self, t: float, q_data: npt.NDArray[numpy.complex128]
+        self, t: float, q_data2: npt.NDArray[numpy.complex128]
     ) -> None:
         fig, ax = plt.subplots(
             subplot_kw={"projection": "3d"}, figsize=(6, 5.5), layout="constrained"
@@ -335,9 +355,9 @@ class H1D3Report:
         ax.set_zlim3d(self._zmin, self._zmax)
         ax.set_xlabel("y")
         ax.set_ylabel("x")
-        np_qxv = self.swap_hl(self._x)
-        np_qyv = self.swap_hl(self._y)
-        sw_q_data = self.swap_hl(q_data)
+        np_qxv = self.swap_hl_j(self._x)
+        np_qyv = self.swap_hl_i(self._y)
+        sw_q_data = self.swap_hl_ij(q_data2)
         scale = math.pow(dq, -3/2)
         ax.plot_surface(
             np_qyv,
@@ -354,7 +374,7 @@ class H1D3Report:
         plt.close(fig)
 
     def produce_frame3d_qp(
-        self, t: float, q_data: npt.NDArray[numpy.complex128], shifted_p_data: npt.NDArray[numpy.complex128]
+        self, t: float, q_data2: npt.NDArray[numpy.complex128], shifted_p_data2: npt.NDArray[numpy.complex128]
     ) -> None:
         fig, axs = plt.subplots(
             2, 1, subplot_kw={"projection": "3d"}, figsize=(6, 11), layout="constrained"
@@ -368,13 +388,13 @@ class H1D3Report:
         ax.set_zlim3d(self._zmin, self._zmax)
         ax.set_xlabel("y")
         ax.set_ylabel("x")
-        np_qxv = self.swap_hl(self._x)
-        np_qyv = self.swap_hl(self._y)
-        sw_q_data = self.swap_hl(q_data)
+        np_qxv = self.swap_hl_j(self._x)
+        np_qyv = self.swap_hl_i(self._y)
+        sw_q_data2 = self.swap_hl_ij(q_data2)
         ax.plot_surface(
             np_qyv,
             np_qxv,
-            math.pow(dq, -3/2) * numpy.real(sw_q_data),
+            math.pow(dq, -3/2) * numpy.real(sw_q_data2),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
@@ -391,7 +411,7 @@ class H1D3Report:
         ax.plot_surface(
             np_ky,
             np_kx,
-            math.pow(dk, -3/2) * numpy.real(shifted_p_data),
+            math.pow(dk, -3/2) * numpy.real(shifted_p_data2),
             cmap=colormap,
             vmin=self._kvmin,
             vmax=self._kvmax,
@@ -402,11 +422,11 @@ class H1D3Report:
         fig.savefig(filename)
         plt.close(fig)
 
-    def produce_frame3d3(self, t: float, q_data: npt.NDArray[numpy.complex128]) -> None:
+    def produce_frame3d3(self, t: float, q_data2: npt.NDArray[numpy.complex128]) -> None:
         fig, axs = plt.subplots(
             1, 3, subplot_kw={"projection": "3d"}, figsize=(15, 6), layout="constrained"
         )
-        self._produce_frame3d3q(t, q_data, axs)
+        self._produce_frame3d3q(t, q_data2, axs)
         fig.suptitle(self._title + f" t={t:6.3f}")
         filename = f"{self._images_dir}/t_{t:06.3f}_3d3.png"
         print("writing to file : ", filename)
@@ -435,7 +455,7 @@ class H1D3Report:
         plt.close(fig)
 
     def _produce_frame3d3q(
-        self, t: float, q_data: npt.NDArray[numpy.complex128], axs
+        self, t: float, q_data2: npt.NDArray[numpy.complex128], axs
     ) -> None:
         colormap = plt.get_cmap(self._colormap_name)
         dq = self._dq
@@ -446,14 +466,14 @@ class H1D3Report:
         ax.set_xlabel("y")
         ax.set_ylabel("x")
 
-        np_qyv = self.swap_hl(self._y)
-        np_qxv = self.swap_hl(self._x)
-        sw_q_data = self.swap_hl(q_data)
+        np_qxv = self.swap_hl_j(self._x)
+        np_qyv = self.swap_hl_i(self._y)
+        sw_q_data2 = self.swap_hl_ij(q_data2)
 
         ax.plot_surface(
             np_qyv,
             np_qxv,
-            math.pow(dq, -3/2) * numpy.abs(sw_q_data),
+            math.pow(dq, -3/2) * numpy.abs(sw_q_data2),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
@@ -467,7 +487,7 @@ class H1D3Report:
         ax.plot_surface(
             np_qyv,
             np_qxv,
-            math.pow(dq, -3/2) * numpy.real(sw_q_data),
+            math.pow(dq, -3/2) * numpy.real(sw_q_data2),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
@@ -481,14 +501,14 @@ class H1D3Report:
         ax.plot_surface(
             np_qyv,
             np_qxv,
-            math.pow(dq, -3/2) * numpy.imag(sw_q_data),
+            math.pow(dq, -3/2) * numpy.imag(sw_q_data2),
             cmap=colormap,
             vmin=self._vmin,
             vmax=self._vmax,
         )
 
     def _produce_frame3d3p(
-        self, t: float, p_data: npt.NDArray[numpy.complex128], axs
+        self, t: float, p_data2: npt.NDArray[numpy.complex128], axs
     ) -> None:
         colormap = plt.get_cmap(self._colormap_name)
         dk = self._dk
@@ -499,13 +519,13 @@ class H1D3Report:
         ax.set_xlabel("ky")
         ax.set_ylabel("kx")
 
-        np_ky = self._shift_p_data(self._ky)
-        np_kx = self._shift_p_data(self._kx)
-        shifted_p_data = p_data
+        np_kx = self.swap_hl_j(self._kx)
+        np_ky = self.swap_hl_i(self._ky)
+        shifted_p_data2 = self.swap_hl_ij(p_data2)
         ax.plot_surface(
             np_ky,
             np_kx,
-            math.pow(dk, -3/2) * numpy.abs(shifted_p_data),
+            math.pow(dk, -3/2) * numpy.abs(shifted_p_data2),
             cmap=colormap,
             vmin=self._kvmin,
             vmax=self._kvmax,
@@ -519,7 +539,7 @@ class H1D3Report:
         ax.plot_surface(
             np_ky,
             np_kx,
-            math.pow(dk, -3/2) * numpy.real(shifted_p_data),
+            math.pow(dk, -3/2) * numpy.real(shifted_p_data2),
             cmap=colormap,
             vmin=self._kvmin,
             vmax=self._kvmax,
@@ -533,28 +553,28 @@ class H1D3Report:
         ax.plot_surface(
             np_ky,
             np_kx,
-            math.pow(dk, -3/2) * numpy.imag(shifted_p_data),
+            math.pow(dk, -3/2) * numpy.imag(shifted_p_data2),
             cmap=colormap,
             vmin=self._kvmin,
             vmax=self._kvmax,
         )
 
-    def record_energy(self, t, q_data, p_data, q0_data=None):
+    def record_energy(self, t, q_data3, p_data3, q0_data=None):
         logger.info("Recording energy at t=%f", t)
         self._trace_time.append(t)
 
-        Hk = numpy.sum(numpy.abs(p_data)**2 * self._hk).item()
+        Hk = numpy.sum(numpy.abs(p_data3)**2 * self._hk3).item()
         self._hk_trace.append(Hk)
 
         for key in self._hp.keys():
             hpf = self._hp[key]
-            Hp = numpy.sum(numpy.abs(q_data)**2 * hpf).item()
+            Hp = numpy.sum(numpy.abs(q_data3)**2 * hpf).item()
             Htot = Hk + Hp
             self._hp_trace[key].append(Hp)
             logger.info("t=%f, Hk=%f, %s=%f, Hk+%s=%f", t, Hk, key, Hp, key, Htot)
         
         if q0_data is not None:
-            prod = numpy.vdot(q0_data, q_data).item()
+            prod = numpy.vdot(q0_data, q_data3).item()
             self._autocorr_trace.append(prod)
 
     def _plot_energy(self):
