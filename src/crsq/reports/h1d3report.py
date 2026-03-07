@@ -181,13 +181,14 @@ class H1D3Report:
     ) -> None:
         """save 3d grid data to a text file"""
         file_name = self._frames_dir + f"/{t:06.3f}.{label}.csv"
+        q_data2 = q_data3[:, :, 0]
         print("Saving to : ", file_name)
-        self.write_3d_data(file_name, q_data3)
+        self.write_2d_data(file_name, q_data2)
 
-    def write_3d_data(
+    def write_2d_data(
         self, file_name: str, data: npt.NDArray[numpy.complex128]
     ) -> None:
-        """save 3d grid data to a text file"""
+        """save 2d grid data to a text file"""
         if os.path.exists(file_name):
             logger.info("removing old file : %s", file_name)
             os.remove(file_name)
@@ -198,31 +199,28 @@ class H1D3Report:
         logger.info("sum of |ψ|^2 : %f", sumdata)
         logger.info("max of |ψ| : %f", maxdata)
         with open(file_name, "w") as f:
-            f.write(f"{shp[0]},{shp[1]},{shp[2]}\n")
+            f.write(f"{shp[0]},{shp[1]}\n")
             for i in range(shp[0]):
                 for j in range(shp[1]):
-                    for k in range(shp[2]):
-                        f.write(f"{i},{j},{k},{data[i,j,k].real},{data[i,j,k].imag}\n")
+                    f.write(f"{i},{j},{data[i,j].real},{data[i,j].imag}\n")
 
-    def read_3d_data(self, file_name: str) -> npt.NDArray[numpy.complex128]:
-        """read 3d grid data from a text file"""
+    def read_2d_data(self, file_name: str) -> npt.NDArray[numpy.complex128]:
+        """read 2d grid data from a text file"""
         with open(file_name, "r") as f:
             s = f.readline().split(",")
             n1 = int(s[0])
             n2 = int(s[1])
-            n3 = int(s[2])
-            data = numpy.zeros((n1, n2, n3), dtype=numpy.complex128)
+            data = numpy.zeros((n1, n2), dtype=numpy.complex128)
             for i in range(n1):
                 for j in range(n2):
-                    for k in range(n3):
-                        s = f.readline().split(",")
-                        data[i, j, k] = complex(float(s[3]), float(s[4]))
+                    s = f.readline().split(",")
+                    data[i, j] = complex(float(s[2]), float(s[3]))
         return data
 
     def read_data_sample(self, label: str, t: float) -> npt.NDArray[numpy.complex128]:
-        """read q-space 3d grid data from a text file"""
+        """read q-space 2d grid data from a text file"""
         file_name = self._frames_dir + f"/{t:06.3f}.{label}.csv"
-        return self.read_3d_data(file_name)
+        return self.read_2d_data(file_name)
 
     def produce_frame(
         self,
@@ -561,51 +559,59 @@ class H1D3Report:
 
     def record_energy(self, t, q_data3, p_data3, q0_data=None):
         logger.info("Recording energy at t=%f", t)
-        self._trace_time.append(t)
 
+        csvdata = {}
+        csvdata["t"] = t
         Hk = numpy.sum(numpy.abs(p_data3)**2 * self._hk3).item()
-        self._hk_trace.append(Hk)
+        csvdata["Hk"] = Hk
 
         for key in self._hp.keys():
             hpf = self._hp[key]
             Hp = numpy.sum(numpy.abs(q_data3)**2 * hpf).item()
             Htot = Hk + Hp
-            self._hp_trace[key].append(Hp)
+            csvdata[key] = Hp
             logger.info("t=%f, Hk=%f, %s=%f, Hk+%s=%f", t, Hk, key, Hp, key, Htot)
         
         if q0_data is not None:
             prod = numpy.vdot(q0_data, q_data3).item()
             self._autocorr_trace.append(prod)
+            csvdata["autocorr.re"] = numpy.real(prod)
+            csvdata["autocorr.im"] = numpy.imag(prod)
+
+        csv_filename = self._frames_dir + f"/{t:06.3f}.ene.csv"
+        energy_df = pd.DataFrame(
+            index=npt,
+            data=csvdata,
+        )
+        energy_df.to_csv(
+            csv_filename, index=True, index_label="t", header=True, float_format="%.6f"
+        )
+        
 
     def _plot_energy(self):
         logger.info("Plotting energy trace")
+        traces = self._read_energy_csv_files()
         fig, axs = plt.subplots(3, 1, figsize=(6, 12), layout="constrained")
         psi_label = self._psifunc_label
         ax = axs[0]
         ax.set_title(f"{self._title} {psi_label}")
-        npt = numpy.array(self._trace_time)
-        nphk = numpy.array(self._hk_trace)
+        npt = numpy.array(traces["t"])
+        nphk = numpy.array(traces["Hk"])
         ax.grid(True)
         ax.plot(npt, nphk, label="Hk(t)")
-        csvdata = {}
-        csvdata["Hk"] = nphk
         for key in self._hp.keys():
-            nphp = numpy.array(self._hp_trace[key])
-            csvdata[key] = nphp
+            nphp = numpy.array(traces[key])
             ax.plot(npt, nphp, label=f"{key}(t)")
-        for key in self._hp.keys():
-            nphp = numpy.array(self._hp_trace[key])
             nphtot = nphk + nphp
-            csvdata["Hk+" + key] = nphtot
             ax.plot(npt, nphtot, label=f"Hk(t)+{key}(t)")
         ax.set_xlabel("t (time)")
         ax.set_ylabel("energy")
         ax.legend()
 
         ax = axs[1]
-        npautocorr = numpy.array(self._autocorr_trace)
-        csvdata["autocorr.re"] = numpy.real(npautocorr)
-        csvdata["autocorr.im"] = numpy.imag(npautocorr)
+        npautocorr_re = numpy.array(traces["autocorr.re"])
+        npautocorr_im = numpy.array(traces["autocorr.im"])
+        npautocorr = npautocorr_re + 1j * npautocorr_im
         fidelity = numpy.abs(npautocorr) ** 2
         ax.plot(npt, fidelity)
         ax.grid(True)
@@ -634,6 +640,18 @@ class H1D3Report:
         energy_df.to_csv(
             csv_filename, index=True, index_label="t", header=True, float_format="%.6f"
         )
+
+    def _read_energy_csv_files(self):
+        traces = {}
+        # read energy csv files. All files have the same columns and one data row.
+        # append the data columns to a list in the 'traces' dict, with the column name as the key.
+        for csv_file in glob.glob(f"{self._frames_dir}/*.ene.csv"):
+            df = pd.read_csv(csv_file, index_col=0)
+            for col in df.columns:
+                if col not in traces:
+                    traces[col] = []
+                traces[col].append(df[col].iloc[0])
+        return traces
 
     def generate_report(self) -> None:
         """"""
