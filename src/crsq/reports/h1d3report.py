@@ -225,12 +225,10 @@ class H1D3Report:
     def produce_frame(
         self,
         t: float,
-        q_data3: npt.NDArray[numpy.complex128],
-        p_data3: npt.NDArray[numpy.complex128],
+        q_data2: npt.NDArray[numpy.complex128],
+        p_data2: npt.NDArray[numpy.complex128],
     ) -> None:
         """ """
-        q_data2 = q_data3[:, :, 0]
-        p_data2 = p_data3[:, :, 0]
         logger.info("Producing frame for t=%f", t)
         p_data2_shifted = self.swap_hl_ij(p_data2)
         if self._plot_type == "none":
@@ -561,7 +559,6 @@ class H1D3Report:
         logger.info("Recording energy at t=%f", t)
 
         csvdata = {}
-        csvdata["t"] = t
         Hk = numpy.sum(numpy.abs(p_data3)**2 * self._hk3).item()
         csvdata["Hk"] = Hk
 
@@ -574,14 +571,15 @@ class H1D3Report:
         
         if q0_data is not None:
             prod = numpy.vdot(q0_data, q_data3).item()
-            self._autocorr_trace.append(prod)
             csvdata["autocorr.re"] = numpy.real(prod)
             csvdata["autocorr.im"] = numpy.imag(prod)
 
+        t_index = [t]
+
         csv_filename = self._frames_dir + f"/{t:06.3f}.ene.csv"
         energy_df = pd.DataFrame(
-            index=npt,
             data=csvdata,
+            index=t_index
         )
         energy_df.to_csv(
             csv_filename, index=True, index_label="t", header=True, float_format="%.6f"
@@ -633,24 +631,24 @@ class H1D3Report:
         fig.savefig(fname=filename)
         plt.close(fig)
 
-        energy_df = pd.DataFrame(
-            index=npt,
-            data=csvdata,
-        )
-        energy_df.to_csv(
-            csv_filename, index=True, index_label="t", header=True, float_format="%.6f"
-        )
-
     def _read_energy_csv_files(self):
         traces = {}
-        # read energy csv files. All files have the same columns and one data row.
+        # read energy csv files. Files should be read in the order of time, which can be achieved by sorting the file names.
+        # All files have the same columns and one data row.
         # append the data columns to a list in the 'traces' dict, with the column name as the key.
-        for csv_file in glob.glob(f"{self._frames_dir}/*.ene.csv"):
-            df = pd.read_csv(csv_file, index_col=0)
-            for col in df.columns:
-                if col not in traces:
-                    traces[col] = []
-                traces[col].append(df[col].iloc[0])
+        # The first column is 't' for time, and should be gathered as well.
+        # Each of the resulting lists in traces should be a numpy array.
+        energy_files = glob.glob(f"{self._frames_dir}/*.ene.csv")
+        energy_files.sort()
+        for energy_file in energy_files:
+            df = pd.read_csv(energy_file)
+            for column in df.columns:
+                if column not in traces:
+                    traces[column] = []
+                traces[column].append(df[column][0])
+        # Convert lists to numpy arrays
+        for column in traces:
+            traces[column] = numpy.array(traces[column])
         return traces
 
     def generate_report(self) -> None:
