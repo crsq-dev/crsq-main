@@ -567,6 +567,7 @@ class H1D3Report:
             Hp = numpy.sum(numpy.abs(q_data3)**2 * hpf).item()
             Htot = Hk + Hp
             csvdata[key] = Hp
+            csvdata[f"Hk+{key}"] = Htot
             logger.info("t=%f, Hk=%f, %s=%f, Hk+%s=%f", t, Hk, key, Hp, key, Htot)
         
         if q0_data is not None:
@@ -630,6 +631,10 @@ class H1D3Report:
         print("writing to file : ", filename, csv_filename)
         fig.savefig(fname=filename)
         plt.close(fig)
+        # write the content of the traces map as a csv file
+        # named energy_trace.csv in the output directory, with columns for time and each of the energy components and autocorrelation.
+        energy_trace_df = pd.DataFrame(traces)
+        energy_trace_df.to_csv(csv_filename, index=False)
 
     def _read_energy_csv_files(self):
         traces = {}

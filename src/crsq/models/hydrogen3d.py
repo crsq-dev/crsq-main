@@ -51,7 +51,7 @@ class PsiH3D:
         L = sp.assoc_laguerre(rho, self._n - self._l - 1, 2 * self._l + 1)
         R = self._scale * numpy.exp(-rho / 2) * rho ** self._l * L
         # angular part Y(θ,φ)
-        theta = numpy.arccos(numpy.where(rv == 0, 1.0, dzv / rv))
+        theta = numpy.arccos(numpy.divide(dzv, rv, out=numpy.ones_like(rv), where=(rv != 0)))
         phi = numpy.arctan2(dyv, dxv)
         Y = sp.sph_harm(self._m, self._l, phi, theta)
         psi = R * Y
@@ -75,7 +75,7 @@ class PsiH3D:
         dyv = y - self._Qy0
         dzv = z - self._Qz0
         rv = numpy.sqrt(dxv * dxv + dyv * dyv + dzv * dzv)
-        theta = numpy.arccos(numpy.where(rv == 0, 1.0, dzv / rv))
+        theta = numpy.arccos(numpy.divide(dzv, rv, out=numpy.ones_like(rv), where=(rv != 0)))
         phi = numpy.arctan2(dyv, dxv)
         Y = sp.sph_harm(self._m, self._l, phi, theta)
         return Y
