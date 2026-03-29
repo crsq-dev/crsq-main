@@ -3,6 +3,7 @@ Hydrogen atom model in 2D.
 """
 
 import math
+# works only with numpy.
 import numpy
 import scipy.special as sp
 import logging
@@ -113,22 +114,23 @@ class PsiH2D:
         dxv = qxv - self._Qx0
         dyv = qyv - self._Qy0
         rho = numpy.sqrt(numpy.square(dxv) + numpy.square(dyv))
-        x0 = int(self._Qx0 // self._dq)
-        y0 = int(self._Qy0 // self._dq)
         A = math.sqrt(q0**3 * math.factorial(n - absm)) / (
             math.pi * math.factorial(n + absm)
         )
-        q0rho = q0 * rho
-        q0rho2 = 2 * q0rho
 
-        np_lg = sp.assoc_laguerre(q0rho2, n - absm, 2 * absm)
-        lg = numpy.array(np_lg)
-
+        # discretized coordinate of the center of the potential
+        x0 = int(self._Qx0 // self._dq)
+        y0 = int(self._Qy0 // self._dq)
+        # suppress division by zero
         rho[x0, y0] = 1
         omega = (dxv + 1j * dyv) / rho
-        # suppress division by zero
         omega[x0, y0] = 1
         rho[x0, y0] = 0
+
+        q0rho = q0 * rho
+        q0rho2 = 2 * q0rho
+        np_lg = sp.assoc_laguerre(q0rho2, n - absm, 2 * absm)
+        lg = numpy.array(np_lg)
 
         psi = (
             A
@@ -137,6 +139,7 @@ class PsiH2D:
             * lg
             * numpy.power(omega, m)
         )
+        logger.info("PsiH2d: shape of psi = %s, x0 = %d, y0 = %d", psi.shape, x0, y0)
         return psi
 
     @property
@@ -337,23 +340,27 @@ class VHAtom2:
         self._eps = eps
         self._frac_bits = frac_bits
         logger.info(
-            "VHAtom2.__init__:   dq = %f, r0=%f  r0/dq=%f, eps=%f", dq, r0, r0 / dq, eps
+            "VHAtom2.__init__:   dq = %f, r0=%f  r0/dq=%f, eps=%f, frac_bits=%d", dq, r0, r0 / dq, eps, frac_bits
         )
 
     def __call__(self, x: numpy.ndarray, y: numpy.ndarray) -> numpy.ndarray:
         logger.info("VHAtom2.__call__")
         if self._eps > 0:
+            # soft-core potential
             return self._calc_with_eps(x, y)
 
         xq0 = int(self._Qx0 / self._dq)
         yq0 = int(self._Qy0 / self._dq)
 
-        if self._r0 <= 0:
+        if self._frac_bits < 0:
+            # no fixed-point emulation.
+            logger.info("VHAtom2.__call__: not emulating fixed point")
             riA = numpy.sqrt(
                 (numpy.square(x - self._Qx0) + numpy.square(y - self._Qy0))
             )
         else:
             # emulate fixed point calculation with frac_bits
+            logger.info("VHAtom2.__call__: emulating fixed point using frac_bits = %d, r0 = %f", self._frac_bits, self._r0)
             scale = 2 ** self._frac_bits
             hscale = 2 ** (self._frac_bits // 2)
             xq = numpy.floor(x / self._dq).astype(numpy.int32)

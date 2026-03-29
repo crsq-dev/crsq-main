@@ -37,10 +37,16 @@ class H1D1Report:
         num_elec_iters: int,
         num_nucl_iters: int,
         signed: bool,
+        dpi: int|None = None
     ):
         self._outdir = outdir
         self._frames_dir = outdir + "/frames"
-        self._images_dir = outdir + "/images"
+        if dpi is not None:
+            self._images_dir = outdir + f"/images{dpi}dpi"
+            self._circuits_dir = outdir + f"/circuits{dpi}dpi"
+        else:
+            self._images_dir = outdir + "/images"
+            self._circuits_dir = outdir + "/circuits"
         self._title = title
         self._psifunc_label = psifunc_label
         self._n1 = num_coordinate_bits
@@ -56,6 +62,13 @@ class H1D1Report:
         self._num_elec_iters = num_elec_iters
         self._num_nucl_iters = num_nucl_iters
         self._signed = signed
+        self._dpi = dpi
+        stylename = 'clifford'
+        if dpi is not None:
+            self._qstyle = { 'name': stylename, 'dpi': dpi, 'fontsize': 14, 'subfontsize': 10}
+        else:
+            self._qstyle = { 'name': stylename}
+            self._dpi = 100
         # x and qx values
         M = self._M
         if self._signed:
@@ -83,21 +96,25 @@ class H1D1Report:
         images_dir = self._images_dir
         if not os.path.exists(images_dir):
             os.makedirs(images_dir)
+        if not os.path.exists(self._circuits_dir):
+            os.makedirs(self._circuits_dir)
         if clean:
             for f in glob.glob(f"{images_dir}/t_*.png"):
+                os.remove(f)
+            for f in glob.glob(f"{self._circuits_dir}/*.png"):
                 os.remove(f)
             if os.path.exists(self.moviefile):
                 os.remove(self.moviefile)
 
     def add_circuit_diagram(self, circuit: QuantumCircuit, block_name: str):
         """Add a circuit diagram to the report"""
-        fname = f"{self._outdir}/{block_name}.png"
+        fname = f"{self._circuits_dir}/{block_name}.png"
         logger.info(f"Saving circuit diagram of {block_name} to {fname}")
-        circuit.draw(output="mpl", filename=fname, scale=0.6, fold=100)
+        circuit.draw(output="mpl", filename=fname, scale=0.6, fold=100, style=self._qstyle)
 
     def open_report(self):
         """Start a plot"""
-        self._fig, self._axs = plt.subplots(3, 1, figsize=(6, 12))
+        self._fig, self._axs = plt.subplots(3, 1, figsize=(6, 12), dpi=self._dpi)
         self._fig.suptitle(self._title)
         self._axs[0].set_title("abs")
         self._axs[0].set_ylim(0, self._psi_axis_scale)
@@ -169,7 +186,7 @@ class H1D1Report:
         """Draw a single frame"""
         sw_q_data = self.swapv(q_data)
 
-        fig, axs = plt.subplots(2, 1, figsize=(8, 8), layout="constrained")
+        fig, axs = plt.subplots(2, 1, figsize=(8, 8), layout="constrained", dpi=self._dpi)
         fig.suptitle(self._title + f" t={t:.3f}")
         self._produce_psiq_frame(t, axs[0], sw_q_data)
         self._produce_psip_frame(t, axs[1], p_data)
@@ -189,7 +206,7 @@ class H1D1Report:
         self._hp_trace.append(Hp)
 
     def _plot_energy(self):
-        fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+        fig, ax = plt.subplots(1, 1, figsize=(10, 8), dpi=self._dpi)
         psi_label = self._psifunc_label
         ax.set_title(f"{self._title} {psi_label}")
         npt = np.array(self._trace_time)
@@ -220,7 +237,7 @@ class H1D1Report:
         energy_df.to_csv(csv_filename, index=True, index_label='t', header=True, float_format="%.6f")
 
     def _produce_video_frame(self, t: float, sw_q_data, p_data):
-        fig, axs = plt.subplots(3, 1, figsize=(6, 9), layout="constrained")
+        fig, axs = plt.subplots(3, 1, figsize=(6, 9), layout="constrained", dpi=self._dpi)
         fig.suptitle(self._title + f" t={t:.3f}")
         self._produce_psiq_frame(t, axs[0], sw_q_data)
         self._produce_psip_frame(t, axs[1], p_data)

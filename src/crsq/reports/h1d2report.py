@@ -148,6 +148,7 @@ class H1D2Report:
        :param num_elec_iters: number of electronic iterations per nuclear iteration
        :param num_nucl_iters: number of nuclear iterations
        :param signed: whether to use signed coordinates (i.e. -M/2 to M/2-1) or unsigned coordinates (0 to M-1)
+       :param dpi: DPI for the output images (specify None for default)
        :param colormap_name: name of the colormap to use for plotting (default: "cmr.guppy")    
     """
     def __init__(
@@ -173,13 +174,19 @@ class H1D2Report:
         num_elec_iters: int,
         num_nucl_iters: int,
         signed=False,
+        dpi: int|None = None,
         colormap_name: str = "cmr.guppy",
     ):
         self._outdir = outdir
         self._plot_type = plot_type
         self._colormap_name = colormap_name
         self._frames_dir = outdir + "/frames"
-        self._images_dir = outdir + "/images"
+        if dpi is not None:
+            self._images_dir = outdir + f"/images{dpi}dpi"
+            self._circuits_dir = outdir + f"/circuits{dpi}dpi"
+        else:
+            self._images_dir = outdir + "/images"
+            self._circuits_dir = outdir + "/circuits"
         self._title = title
         self._psifunc_label = psifunc_label
         self._n1 = num_coordinate_bits
@@ -212,6 +219,13 @@ class H1D2Report:
             self._yq, self._xq = numpy.meshgrid(iq, iq)
         else:
             self._yq, self._xq = numpy.meshgrid(numpy.arange(M), numpy.arange(M))
+        self._dpi = dpi
+        stylename = 'clifford'
+        if dpi is not None:
+            self._qstyle = { 'name': stylename, 'dpi': dpi, 'fontsize': 14, 'subfontsize': 10}
+        else:
+            self._qstyle = { 'name': stylename}
+            self._dpi = 100
         dq = self._dq
         self._y = self._yq * dq
         self._x = self._xq * dq
@@ -253,19 +267,22 @@ class H1D2Report:
         images_dir = self._images_dir
         if not os.path.exists(images_dir):
             os.makedirs(images_dir)
+        if not os.path.exists(self._circuits_dir):
+            os.makedirs(self._circuits_dir)
         if clean:
             for f in glob.glob(f"{images_dir}/t_*.png"):
+                os.remove(f)
+            for f in glob.glob(f"{self._circuits_dir}/*.png"):
                 os.remove(f)
 
     def add_circuit_diagram(self, circuit: QuantumCircuit, block_name: str):
         """Add a circuit diagram to the report"""
-        fname = f"{self._outdir}/{block_name}.png"
+        fname = f"{self._circuits_dir}/{block_name}.png"
         logger.info(f"Saving circuit diagram of {block_name} to {fname}")
-        circuit.draw(output="mpl", filename=fname, scale=0.6, fold=100)
+        circuit.draw(output="mpl", filename=fname, scale=0.6, fold=100, style=self._qstyle)
 
     def open_report(self, clean = True) -> None:
         """"""
-        self._prepare_dir(clean)
 
         self._trace_time = []
         self._autocorr_trace = []
@@ -370,7 +387,7 @@ class H1D2Report:
         q_data: npt.NDArray[numpy.complex128],
         p_data: npt.NDArray[numpy.complex128],
     ) -> None:
-        fig, axs = plt.subplots(1, 2, figsize=(8, 4))
+        fig, axs = plt.subplots(1, 2, figsize=(8, 4), layout="constrained", dpi=self._dpi)
         colormap = plt.get_cmap(self._colormap_name)
         ax: plt.Axes = axs[0]
         # ax.imshow(numpy.abs(self._psi1q))
@@ -402,7 +419,7 @@ class H1D2Report:
 
     def produce_frame3d(self, t, q_data: npt.NDArray[numpy.complex128]) -> None:
         fig, ax = plt.subplots(
-            subplot_kw={"projection": "3d"}, figsize=(6, 5.5), layout="constrained"
+            subplot_kw={"projection": "3d"}, figsize=(6, 5.5), layout="constrained", dpi=self._dpi
         )
         colormap = plt.get_cmap(self._colormap_name)
         dq = self._dq
@@ -436,7 +453,7 @@ class H1D2Report:
         self, t: float, q_data: npt.NDArray[numpy.complex128]
     ) -> None:
         fig, ax = plt.subplots(
-            subplot_kw={"projection": "3d"}, figsize=(6, 5.5), layout="constrained"
+            subplot_kw={"projection": "3d"}, figsize=(6, 5.5), layout="constrained", dpi=self._dpi
         )
         colormap = plt.get_cmap(self._colormap_name)
         dq = self._dq
@@ -467,7 +484,7 @@ class H1D2Report:
         self, t: float, q_data: npt.NDArray[numpy.complex128], shifted_p_data: npt.NDArray[numpy.complex128]
     ) -> None:
         fig, axs = plt.subplots(
-            2, 1, subplot_kw={"projection": "3d"}, figsize=(6, 11), layout="constrained"
+            2, 1, subplot_kw={"projection": "3d"}, figsize=(6, 11), layout="constrained", dpi=self._dpi
         )
         colormap = plt.get_cmap(self._colormap_name)
         dq = self._dq
@@ -514,7 +531,7 @@ class H1D2Report:
 
     def produce_frame3d3(self, t: float, q_data: npt.NDArray[numpy.complex128]) -> None:
         fig, axs = plt.subplots(
-            1, 3, subplot_kw={"projection": "3d"}, figsize=(15, 6), layout="constrained"
+            1, 3, subplot_kw={"projection": "3d"}, figsize=(15, 6), layout="constrained", dpi=self._dpi
         )
         self._produce_frame3d3q(t, q_data, axs)
         fig.suptitle(self._title + f" t={t:6.3f}")
@@ -535,6 +552,7 @@ class H1D2Report:
             subplot_kw={"projection": "3d"},
             figsize=(15, 10),
             layout="constrained",
+            dpi=self._dpi
         )
         self._produce_frame3d3q(t, q_data, axs[0, :])
         self._produce_frame3d3p(t, p_data, axs[1, :])
@@ -669,7 +687,7 @@ class H1D2Report:
 
     def _plot_energy(self):
         logger.info("Plotting energy trace")
-        fig, axs = plt.subplots(3, 1, figsize=(6, 12), layout="constrained")
+        fig, axs = plt.subplots(3, 1, figsize=(6, 12), layout="constrained", dpi=self._dpi)
         psi_label = self._psifunc_label
         ax = axs[0]
         ax.set_title(f"{self._title} {psi_label}")

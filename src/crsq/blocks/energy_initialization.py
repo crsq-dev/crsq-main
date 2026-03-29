@@ -261,7 +261,7 @@ class SlaterDeterminantPreparationBlock(Frame):
         """
             :param energy_state_index: which energy state to build
         """
-        super().__init__(label="Ψsd")
+        super().__init__(label="  Ψsd")
         t1 = time.time()
         # logger.info("start: SlaterDeterminantPreparationBlock()")
         assert isinstance(ene_spec, EnergyConfigurationSpec)
