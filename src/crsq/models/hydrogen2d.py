@@ -3,6 +3,7 @@ Hydrogen atom model in 2D.
 """
 
 import math
+
 # works only with numpy.
 import numpy
 import scipy.special as sp
@@ -114,8 +115,8 @@ class PsiH2D:
         dxv = qxv - self._Qx0
         dyv = qyv - self._Qy0
         rho = numpy.sqrt(numpy.square(dxv) + numpy.square(dyv))
-        A = math.sqrt(q0**3 * math.factorial(n - absm)) / (
-            math.pi * math.factorial(n + absm)
+        A = math.sqrt(
+            (q0**3 * math.factorial(n - absm)) / (math.pi * math.factorial(n + absm))
         )
 
         # discretized coordinate of the center of the potential
@@ -340,7 +341,12 @@ class VHAtom2:
         self._eps = eps
         self._frac_bits = frac_bits
         logger.info(
-            "VHAtom2.__init__:   dq = %f, r0=%f  r0/dq=%f, eps=%f, frac_bits=%d", dq, r0, r0 / dq, eps, frac_bits
+            "VHAtom2.__init__:   dq = %f, r0=%f  r0/dq=%f, eps=%f, frac_bits=%d",
+            dq,
+            r0,
+            r0 / dq,
+            eps,
+            frac_bits,
         )
 
     def __call__(self, x: numpy.ndarray, y: numpy.ndarray) -> numpy.ndarray:
@@ -360,8 +366,12 @@ class VHAtom2:
             )
         else:
             # emulate fixed point calculation with frac_bits
-            logger.info("VHAtom2.__call__: emulating fixed point using frac_bits = %d, r0 = %f", self._frac_bits, self._r0)
-            scale = 2 ** self._frac_bits
+            logger.info(
+                "VHAtom2.__call__: emulating fixed point using frac_bits = %d, r0 = %f",
+                self._frac_bits,
+                self._r0,
+            )
+            scale = 2**self._frac_bits
             hscale = 2 ** (self._frac_bits // 2)
             xq = numpy.floor(x / self._dq).astype(numpy.int32)
             yq = numpy.floor(y / self._dq).astype(numpy.int32)
