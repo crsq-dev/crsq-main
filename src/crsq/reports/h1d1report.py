@@ -314,7 +314,7 @@ class H1D1Report:
         logp1 = abspsi[0:WM]
         logp2 = abspsi[M - WM : M]
         logp = np.concatenate([logp2, logp1])
-        ax.plot(np_pv, logp, label="(C) |ψ\u0303(k)|")
+        ax.plot(np_pv, logp, label="|ψ\u0303(k)|")
 
         # logt = np.log2(self._tarray)
         # logt1 = logt[0:WM]
@@ -322,7 +322,7 @@ class H1D1Report:
         # np_logt = np.asnumpy(np.concatenate([logt2, logt1]))
         # ax.plot(np_pv, np_logt, label='log2(T)')
 
-        ax.set_title(f"|ψ\u0303(k)|")
+        ax.set_title(f"(C) |ψ\u0303(k)|")
 
         ax.set_xlabel("k [rad/bohr]")
         ax.set_ylabel("|ψ\u0303|")
